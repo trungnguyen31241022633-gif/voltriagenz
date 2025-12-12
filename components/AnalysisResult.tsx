@@ -1,6 +1,4 @@
-import React, { useState } from 'react';
 import { AnalysisResult, Recommendation } from '../types';
-import { 
   Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, ResponsiveContainer, Tooltip 
 } from 'recharts';
 import { Briefcase, UserCheck, Zap, Award, Users, AlertTriangle, TrendingUp, Star, FileText, X, CheckCircle2, ArrowRight } from 'lucide-react';
