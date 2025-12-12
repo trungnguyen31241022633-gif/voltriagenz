@@ -1,4 +1,3 @@
-import React, { useState, useEffect } from 'react';
 import Header from './components/Header';
 import LandingPage from './components/LandingPage';
 import UploadSection from './components/UploadSection';
