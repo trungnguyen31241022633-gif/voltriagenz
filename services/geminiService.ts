@@ -1,9 +1,17 @@
-import { AnalysisResult } from "../types";
 import { GoogleGenAI, Type } from "@google/genai";
+import { AnalysisResult } from "../types";
 
+// Lấy API key từ environment variable
+// Hỗ trợ cả Vite dev (VITE_GEMINI_API_KEY) và Vercel production (GEMINI_API_KEY)
+const API_KEY = import.meta.env.VITE_GEMINI_API_KEY || 
+                import.meta.env.GEMINI_API_KEY || 
+                '';
 
-// ĐÃ SỬA: Thay đổi từ process.env.API_KEY sang process.env.GEMINI_API_KEY
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+if (!API_KEY) {
+  console.error('⚠️ GEMINI_API_KEY hoặc VITE_GEMINI_API_KEY chưa được cấu hình!');
+}
+
+const ai = new GoogleGenAI({ apiKey: API_KEY });
 
 const SYSTEM_INSTRUCTION = `
 Bạn là Voltria, một Chuyên gia Tuyển dụng AI cao cấp. Mục tiêu của bạn là phân tích sâu CV (Sơ yếu lý lịch) và đưa ra phản hồi có cấu trúc dựa trên các quy tắc đánh giá cụ thể.
@@ -91,6 +99,10 @@ const responseSchema = {
 
 export const analyzeCV = async (base64Data: string, mimeType: string, targetJob: string): Promise<AnalysisResult> => {
   try {
+    if (!API_KEY) {
+      throw new Error("Vui lòng cấu hình VITE_GEMINI_API_KEY trong environment variables");
+    }
+
     const prompt = `Vị trí công việc mục tiêu: ${targetJob || "Đánh giá tổng quát"}. 
     Hãy phân tích CV đính kèm dựa trên hướng dẫn hệ thống đã cung cấp. Trả lời hoàn toàn bằng Tiếng Việt.`;
 
