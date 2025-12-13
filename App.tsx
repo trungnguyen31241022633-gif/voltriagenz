@@ -4,6 +4,8 @@ import UploadSection from './components/UploadSection';
 import AnalysisResultView from './components/AnalysisResult';
 import { AnalysisResult, UploadState } from './types';
 import { analyzeCV } from './services/geminiService';
+import { useState, useEffect } from 'react';
+
 
 const App: React.FC = () => {
   const [view, setView] = useState<'landing' | 'analyze'>('landing');
