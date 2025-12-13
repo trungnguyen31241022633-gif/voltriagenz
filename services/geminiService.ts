@@ -1,4 +1,5 @@
 import { AnalysisResult } from "../types";
+import { GoogleGenAI, Type } from "@google/genai";
 
 
 // ĐÃ SỬA: Thay đổi từ process.env.API_KEY sang process.env.GEMINI_API_KEY
