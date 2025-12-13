@@ -1,3 +1,4 @@
+import React, { useState } from 'react';
 import { AnalysisResult, Recommendation } from '../types';
   Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, ResponsiveContainer, Tooltip 
 } from 'recharts';
