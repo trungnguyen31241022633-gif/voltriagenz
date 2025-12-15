@@ -1,110 +1,105 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { AnalysisResult } from "../types";
 
-// Lấy API key từ environment variable
-// Hỗ trợ cả Vite dev (VITE_GEMINI_API_KEY) và Vercel production (GEMINI_API_KEY)
-const API_KEY = import.meta.env.VITE_GEMINI_API_KEY || 
-                import.meta.env.GEMINI_API_KEY || 
-                '';
-
-if (!API_KEY) {
-  console.error('⚠️ GEMINI_API_KEY hoặc VITE_GEMINI_API_KEY chưa được cấu hình!');
-}
-
-const ai = new GoogleGenAI({ apiKey: API_KEY });
+const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
 const SYSTEM_INSTRUCTION = `
-Bạn là Voltria, một Chuyên gia Tuyển dụng AI cao cấp. Mục tiêu của bạn là phân tích sâu CV (Sơ yếu lý lịch) và đưa ra phản hồi có cấu trúc dựa trên các quy tắc đánh giá cụ thể.
+Bạn là Voltria, một Chuyên gia Tuyển dụng AI cao cấp. Mục tiêu của bạn là phân tích sâu CV và đưa ra phản hồi có cấu trúc.
 
 **QUAN TRỌNG:** TẤT CẢ NỘI DUNG TRẢ LỜI PHẢI BẰNG TIẾNG VIỆT.
 
 **Quy tắc phân tích:**
-1. **Tóm tắt hồ sơ:** Viết một đoạn văn ngắn gọn (khoảng 3-4 câu) tóm tắt tổng quan về ứng viên, năng lực cốt lõi, kinh nghiệm nổi bật nhất và phong cách làm việc.
-2. **Kinh nghiệm làm việc:** Đánh giá mức độ liên quan đến "Vị trí Mục tiêu" của người dùng. Tìm kiếm số lượng dự án, kỹ thuật sử dụng và tác động cụ thể (doanh thu, tối ưu hóa quy trình). Cảnh báo nếu có quá nhiều kinh nghiệm không liên quan.
-3. **Kỹ năng:** Kiểm tra sự phù hợp giữa kỹ năng được liệt kê và yêu cầu của "Vị trí Mục tiêu". Phân biệt mức độ liên quan của kỹ năng cứng và mềm.
-4. **Lịch sử làm việc (Sự ổn định):**
-   - < 1 năm tại một công ty (trừ thực tập/hợp đồng) = Có thể là Nhảy việc. Tìm lý do.
-   - Lưu ý: Nhảy việc cũng có thể tích cực (khả năng thích ứng, mạng lưới), hãy cân nhắc cả hai mặt.
-5. **Khoảng trống việc làm:** Tìm các khoảng trống (3-6 tháng). Có thể là dấu hiệu sa thải hoặc vấn đề cá nhân, nhưng hãy xem xét kỹ.
-6. **Thăng tiến/Giải thưởng:** Tìm kiếm sự thăng chức, tăng trách nhiệm và các giải thưởng cụ thể. Điều này cho thấy động lực.
-7. **Làm việc nhóm:** Tìm các từ khóa như "Giám sát", "Cố vấn", "Hỗ trợ", "Giảng dạy".
-8. **Sự chủ động:** Tìm kiếm các cải tiến quy trình, giải pháp mới hoặc các chứng chỉ/kỹ năng mới cập nhật.
+1. **Tóm tắt & Đánh giá:** Như quy trình chuẩn (Kinh nghiệm, Kỹ năng, Ổn định, Khoảng trống...).
+2. **Lộ trình phát triển (Roadmap):** Bạn PHẢI đề xuất một lộ trình 3 giai đoạn rõ ràng để ứng viên thăng tiến:
+   - **Giai đoạn 1: Nâng cao kiến thức.** Đề xuất các khóa học cụ thể (tên khóa, nền tảng như Coursera/Udemy/EdX) hoặc chứng chỉ (AWS, IELTS, PMP...) cần thiết để lấp lỗ hổng kỹ năng.
+   - **Giai đoạn 2: Thực hành & Xây dựng Portfolio.** Đề xuất các dự án cá nhân (Project nhỏ), tham gia Open Source, hoặc ý tưởng Start-up nhỏ phù hợp với kỹ năng để làm giàu CV.
+   - **Giai đoạn 3: Cơ hội nghề nghiệp (Fake Data mô phỏng thực tế).** Đề xuất các vị trí tại các loại hình công ty cụ thể (ví dụ: "Tập đoàn công nghệ Viettel - Vị trí Junior Dev", "Startup Fintech tại TP.HCM - Vị trí BA"). Hãy bịa ra các tên công ty hoặc dùng tên công ty thật phổ biến để tạo cảm giác thực tế.
 
 **Yêu cầu đầu ra:**
-Bạn phải trả về một đối tượng JSON hợp lệ. Các trường mô tả, danh sách điểm mạnh/yếu, và gợi ý phải viết bằng Tiếng Việt văn phong chuyên nghiệp.
+Trả về JSON hợp lệ khớp với Schema. Văn phong chuyên nghiệp, khích lệ.
 `;
 
 const responseSchema = {
   type: Type.OBJECT,
   properties: {
-    candidateLevel: { type: Type.STRING, description: "Cấp độ ước tính (ví dụ: Junior, Mid-Level, Senior, Lead)" },
-    summary: { type: Type.STRING, description: "Đoạn văn tóm tắt hồ sơ ứng viên (3-4 câu)" },
-    matchScore: { type: Type.INTEGER, description: "Điểm số từ 0 đến 100 dựa trên mức độ phù hợp với công việc mục tiêu" },
-    strengths: {
-      type: Type.ARRAY,
-      items: { type: Type.STRING },
-      description: "Danh sách các điểm mạnh chính tìm thấy trong CV"
-    },
-    weaknesses: {
-      type: Type.ARRAY,
-      items: { type: Type.STRING },
-      description: "Danh sách các điểm cần cải thiện hoặc cảnh báo"
-    },
+    candidateLevel: { type: Type.STRING, description: "Cấp độ ước tính (Junior, Senior...)" },
+    summary: { type: Type.STRING },
+    matchScore: { type: Type.INTEGER },
+    strengths: { type: Type.ARRAY, items: { type: Type.STRING } },
+    weaknesses: { type: Type.ARRAY, items: { type: Type.STRING } },
     detailedAnalysis: {
       type: Type.OBJECT,
       properties: {
-        experienceMatch: { type: Type.STRING, description: "Đánh giá chi tiết về kinh nghiệm" },
-        skillsAssessment: { type: Type.STRING, description: "Đánh giá về kỹ năng" },
-        jobStability: { type: Type.STRING, description: "Phân tích về lịch sử nhảy việc hoặc thâm niên" },
-        employmentGaps: { type: Type.STRING, description: "Phân tích khoảng trống việc làm" },
-        progressionAndAwards: { type: Type.STRING, description: "Phân tích thăng tiến và giải thưởng" },
-        teamworkAndSoftSkills: { type: Type.STRING, description: "Phân tích kỹ năng mềm và làm việc nhóm" },
-        proactivity: { type: Type.STRING, description: "Phân tích sự chủ động" }
+        experienceMatch: { type: Type.STRING },
+        skillsAssessment: { type: Type.STRING },
+        jobStability: { type: Type.STRING },
+        employmentGaps: { type: Type.STRING },
+        progressionAndAwards: { type: Type.STRING },
+        teamworkAndSoftSkills: { type: Type.STRING },
+        proactivity: { type: Type.STRING }
       },
       required: ["experienceMatch", "skillsAssessment", "jobStability", "employmentGaps", "progressionAndAwards", "teamworkAndSoftSkills", "proactivity"]
     },
     suggestedJobs: {
       type: Type.ARRAY,
-      items: {
-        type: Type.OBJECT,
-        properties: {
-          title: { type: Type.STRING },
-          description: { type: Type.STRING }
-        }
-      }
+      items: { type: Type.OBJECT, properties: { title: { type: Type.STRING }, description: { type: Type.STRING } } }
     },
     suggestedProjects: {
       type: Type.ARRAY,
-      items: {
-        type: Type.OBJECT,
-        properties: {
-          title: { type: Type.STRING },
-          description: { type: Type.STRING }
-        }
-      }
+      items: { type: Type.OBJECT, properties: { title: { type: Type.STRING }, description: { type: Type.STRING } } }
     },
     suggestedCollaborators: {
       type: Type.ARRAY,
-      items: {
-        type: Type.OBJECT,
-        properties: {
-          title: { type: Type.STRING, description: "Vai trò hoặc kiểu người nên làm việc cùng (ví dụ: Senior Backend Dev)" },
-          description: { type: Type.STRING }
+      items: { type: Type.OBJECT, properties: { title: { type: Type.STRING }, description: { type: Type.STRING } } }
+    },
+    developmentRoadmap: {
+      type: Type.OBJECT,
+      description: "Lộ trình phát triển 3 bước",
+      properties: {
+        courses: {
+          type: Type.ARRAY,
+          items: {
+            type: Type.OBJECT,
+            properties: {
+              name: { type: Type.STRING, description: "Tên khóa học/chứng chỉ" },
+              provider: { type: Type.STRING, description: "Nền tảng hoặc tổ chức cấp (Coursera, Google...)" },
+              description: { type: Type.STRING, description: "Tại sao cần học cái này?" }
+            }
+          }
+        },
+        projects: {
+          type: Type.ARRAY,
+          items: {
+            type: Type.OBJECT,
+            properties: {
+              name: { type: Type.STRING, description: "Tên dự án/Startup idea" },
+              durationOrType: { type: Type.STRING, description: "Quy mô (Nhỏ, Trung bình, Startup)" },
+              description: { type: Type.STRING, description: "Mô tả dự án cần làm" }
+            }
+          }
+        },
+        jobs: {
+          type: Type.ARRAY,
+          items: {
+            type: Type.OBJECT,
+            properties: {
+              name: { type: Type.STRING, description: "Vị trí công việc" },
+              provider: { type: Type.STRING, description: "Tên công ty (Mô phỏng)" },
+              description: { type: Type.STRING, description: "Yêu cầu chính hoặc mức lương ước tính" }
+            }
+          }
         }
-      }
+      },
+      required: ["courses", "projects", "jobs"]
     }
   },
-  required: ["candidateLevel", "summary", "matchScore", "strengths", "weaknesses", "detailedAnalysis", "suggestedJobs", "suggestedProjects", "suggestedCollaborators"]
+  required: ["candidateLevel", "summary", "matchScore", "strengths", "weaknesses", "detailedAnalysis", "suggestedJobs", "suggestedProjects", "suggestedCollaborators", "developmentRoadmap"]
 };
 
 export const analyzeCV = async (base64Data: string, mimeType: string, targetJob: string): Promise<AnalysisResult> => {
   try {
-    if (!API_KEY) {
-      throw new Error("Vui lòng cấu hình VITE_GEMINI_API_KEY trong environment variables");
-    }
-
     const prompt = `Vị trí công việc mục tiêu: ${targetJob || "Đánh giá tổng quát"}. 
-    Hãy phân tích CV đính kèm dựa trên hướng dẫn hệ thống đã cung cấp. Trả lời hoàn toàn bằng Tiếng Việt.`;
+    Hãy phân tích CV đính kèm và tạo lộ trình phát triển. Trả lời hoàn toàn bằng Tiếng Việt.`;
 
     const response = await ai.models.generateContent({
       model: 'gemini-2.5-flash',

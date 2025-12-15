@@ -3,13 +3,18 @@ import Header from './components/Header';
 import LandingPage from './components/LandingPage';
 import UploadSection from './components/UploadSection';
 import AnalysisResultView from './components/AnalysisResult';
-import { AnalysisResult, UploadState } from './types';
+import MyActivities from './components/MyActivities';
+import { AnalysisResult, UploadState, ActivityItem } from './types';
 import { analyzeCV } from './services/geminiService';
 
 const App: React.FC = () => {
   const [view, setView] = useState<'landing' | 'analyze'>('landing');
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [result, setResult] = useState<AnalysisResult | null>(null);
+  
+  // State for Activities
+  const [myActivities, setMyActivities] = useState<ActivityItem[]>([]);
+  const [showActivities, setShowActivities] = useState(false);
 
   useEffect(() => {
     // Listen for custom event from Header button to start analysis
@@ -66,12 +71,29 @@ const App: React.FC = () => {
     }
   };
 
+  const handleApplyItem = (item: ActivityItem) => {
+    // Avoid duplicates based on name
+    setMyActivities(prev => {
+      if (prev.some(i => i.name === item.name)) return prev;
+      return [item, ...prev];
+    });
+  };
+
   return (
     <div className="min-h-screen bg-slate-50 text-gray-900 selection:bg-purple-200 selection:text-purple-900 font-['Be_Vietnam_Pro']">
-      <Header />
+      <Header 
+        activityCount={myActivities.length} 
+        onOpenActivities={() => setShowActivities(true)} 
+      />
       
       {/* Hidden button for Header to click if needed via ID, though Event is cleaner */}
       <button id="upload-section-trigger" className="hidden" onClick={handleStart}></button>
+
+      <MyActivities 
+        isOpen={showActivities} 
+        onClose={() => setShowActivities(false)} 
+        activities={myActivities}
+      />
 
       <main>
         {view === 'landing' && <LandingPage onStart={handleStart} />}
@@ -102,7 +124,11 @@ const App: React.FC = () => {
                              ← Tải Lên CV Mới
                          </button>
                     </div>
-                   <AnalysisResultView data={result} />
+                   <AnalysisResultView 
+                      data={result} 
+                      onApply={handleApplyItem}
+                      appliedNames={new Set(myActivities.map(a => a.name))}
+                   />
                 </div>
             )}
           </div>

@@ -1,5 +1,6 @@
 import React from 'react';
 import Hero from './Hero';
+import Marquee from './Marquee';
 import { Users, BookOpen, Calendar, Target, ShieldCheck, Cpu, Briefcase, GraduationCap } from 'lucide-react';
 
 interface LandingPageProps {
@@ -8,9 +9,12 @@ interface LandingPageProps {
 
 const LandingPage: React.FC<LandingPageProps> = ({ onStart }) => {
   return (
-    <div className="flex flex-col">
+    <div className="flex flex-col overflow-x-hidden">
       {/* Hero Section */}
       <Hero onStart={onStart} />
+
+      {/* Marquee Banner */}
+      <Marquee />
 
       {/* Features Section */}
       <section id="features" className="py-24 bg-white relative overflow-hidden">
