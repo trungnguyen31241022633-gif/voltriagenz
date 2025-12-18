@@ -43,11 +43,28 @@ Trả về JSON hợp lệ khớp với Schema. Văn phong chuyên nghiệp, kh�
 const responseSchema = {
   type: "object",
   properties: {
-    candidateLevel: { type: "string", description: "Cấp độ ước tính (Junior, Senior...)" },
-    summary: { type: "string" },
-    matchScore: { type: "integer" },
-    strengths: { type: "array", items: { type: "string" } },
-    weaknesses: { type: "array", items: { type: "string" } },
+    candidateLevel: { 
+      type: "string", 
+      description: "Cấp độ ước tính (Junior, Senior...)" 
+    },
+    summary: { 
+      type: "string",
+      description: "Tóm tắt hồ sơ ứng viên"
+    },
+    matchScore: { 
+      type: "number",
+      description: "Điểm phù hợp từ 0-100"
+    },
+    strengths: { 
+      type: "array", 
+      items: { type: "string" },
+      description: "Các điểm mạnh"
+    },
+    weaknesses: { 
+      type: "array", 
+      items: { type: "string" },
+      description: "Các điểm yếu"
+    },
     detailedAnalysis: {
       type: "object",
       properties: {
@@ -59,19 +76,48 @@ const responseSchema = {
         teamworkAndSoftSkills: { type: "string" },
         proactivity: { type: "string" }
       },
-      required: ["experienceMatch", "skillsAssessment", "jobStability", "employmentGaps", "progressionAndAwards", "teamworkAndSoftSkills", "proactivity"]
+      required: [
+        "experienceMatch", 
+        "skillsAssessment", 
+        "jobStability", 
+        "employmentGaps", 
+        "progressionAndAwards", 
+        "teamworkAndSoftSkills", 
+        "proactivity"
+      ]
     },
     suggestedJobs: {
       type: "array",
-      items: { type: "object", properties: { title: { type: "string" }, description: { type: "string" } } }
+      items: { 
+        type: "object", 
+        properties: { 
+          title: { type: "string" }, 
+          description: { type: "string" } 
+        },
+        required: ["title", "description"]
+      }
     },
     suggestedProjects: {
       type: "array",
-      items: { type: "object", properties: { title: { type: "string" }, description: { type: "string" } } }
+      items: { 
+        type: "object", 
+        properties: { 
+          title: { type: "string" }, 
+          description: { type: "string" } 
+        },
+        required: ["title", "description"]
+      }
     },
     suggestedCollaborators: {
       type: "array",
-      items: { type: "object", properties: { title: { type: "string" }, description: { type: "string" } } }
+      items: { 
+        type: "object", 
+        properties: { 
+          title: { type: "string" }, 
+          description: { type: "string" } 
+        },
+        required: ["title", "description"]
+      }
     },
     developmentRoadmap: {
       type: "object",
@@ -82,10 +128,11 @@ const responseSchema = {
           items: {
             type: "object",
             properties: {
-              name: { type: "string", description: "Tên khóa học/chứng chỉ" },
-              provider: { type: "string", description: "Nền tảng hoặc tổ chức cấp (Coursera, Google...)" },
-              description: { type: "string", description: "Tại sao cần học cái này?" }
-            }
+              name: { type: "string" },
+              provider: { type: "string" },
+              description: { type: "string" }
+            },
+            required: ["name", "description"]
           }
         },
         projects: {
@@ -93,10 +140,11 @@ const responseSchema = {
           items: {
             type: "object",
             properties: {
-              name: { type: "string", description: "Tên dự án/Startup idea" },
-              durationOrType: { type: "string", description: "Quy mô (Nhỏ, Trung bình, Startup)" },
-              description: { type: "string", description: "Mô tả dự án cần làm" }
-            }
+              name: { type: "string" },
+              durationOrType: { type: "string" },
+              description: { type: "string" }
+            },
+            required: ["name", "description"]
           }
         },
         jobs: {
@@ -104,17 +152,29 @@ const responseSchema = {
           items: {
             type: "object",
             properties: {
-              name: { type: "string", description: "Vị trí công việc" },
-              provider: { type: "string", description: "Tên công ty (Mô phỏng)" },
-              description: { type: "string", description: "Yêu cầu chính hoặc mức lương ước tính" }
-            }
+              name: { type: "string" },
+              provider: { type: "string" },
+              description: { type: "string" }
+            },
+            required: ["name", "description"]
           }
         }
       },
       required: ["courses", "projects", "jobs"]
     }
   },
-  required: ["candidateLevel", "summary", "matchScore", "strengths", "weaknesses", "detailedAnalysis", "suggestedJobs", "suggestedProjects", "suggestedCollaborators", "developmentRoadmap"]
+  required: [
+    "candidateLevel", 
+    "summary", 
+    "matchScore", 
+    "strengths", 
+    "weaknesses", 
+    "detailedAnalysis", 
+    "suggestedJobs", 
+    "suggestedProjects", 
+    "suggestedCollaborators", 
+    "developmentRoadmap"
+  ]
 };
 
 export const analyzeCV = async (base64Data: string, mimeType: string, targetJob: string): Promise<AnalysisResult> => {
@@ -123,13 +183,16 @@ export const analyzeCV = async (base64Data: string, mimeType: string, targetJob:
       model: "gemini-1.5-flash",
       generationConfig: {
         responseMimeType: "application/json",
-        responseSchema: responseSchema
+        responseSchema: responseSchema,
+        temperature: 0.7,
+        maxOutputTokens: 8192,
       },
       systemInstruction: SYSTEM_INSTRUCTION
     });
 
     const prompt = `Vị trí công việc mục tiêu: ${targetJob || "Đánh giá tổng quát"}. 
-    Hãy phân tích CV đính kèm và tạo lộ trình phát triển. Trả lời hoàn toàn bằng Tiếng Việt.`;
+Hãy phân tích CV đính kèm và tạo lộ trình phát triển chi tiết. 
+Trả lời HOÀN TOÀN bằng Tiếng Việt.`;
 
     const imagePart = {
       inlineData: {
@@ -143,13 +206,21 @@ export const analyzeCV = async (base64Data: string, mimeType: string, targetJob:
     const text = response.text();
 
     if (!text) {
-      throw new Error("Không nhận được phản hồi từ Gemini");
+      throw new Error("Không nhận được phản hồi từ Gemini AI");
     }
 
     const analysisResult = JSON.parse(text) as AnalysisResult;
     return analysisResult;
-  } catch (error) {
+  } catch (error: any) {
     console.error("Lỗi phân tích Gemini:", error);
-    throw error;
+    
+    // Thông báo lỗi chi tiết hơn
+    if (error.message?.includes('API key not valid')) {
+      throw new Error("API Key không hợp lệ. Vui lòng kiểm tra lại GEMINI_API_KEY trong Environment Variables.");
+    } else if (error.message?.includes('quota')) {
+      throw new Error("Đã vượt quá giới hạn API. Vui lòng thử lại sau hoặc nâng cấp API key.");
+    } else {
+      throw new Error(`Lỗi phân tích CV: ${error.message || 'Không xác định'}`);
+    }
   }
 };
