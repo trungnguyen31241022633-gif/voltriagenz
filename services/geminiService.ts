@@ -1,4 +1,4 @@
-import { GoogleGenAI, Type } from "@google/genai";
+import { GoogleGenerativeAI } from "@google/generative-ai";
 import { AnalysisResult } from "../types";
 
 // Lấy API key từ Vercel Environment Variables
@@ -22,7 +22,7 @@ const getApiKey = (): string => {
 };
 
 // Khởi tạo Gemini AI client
-const ai = new GoogleGenAI({ apiKey: getApiKey() });
+const genAI = new GoogleGenerativeAI(getApiKey());
 
 const SYSTEM_INSTRUCTION = `
 Bạn là Voltria, một Chuyên gia Tuyển dụng AI cao cấp. Mục tiêu của bạn là phân tích sâu CV và đưa ra phản hồi có cấu trúc.
@@ -41,72 +41,72 @@ Trả về JSON hợp lệ khớp với Schema. Văn phong chuyên nghiệp, kh�
 `;
 
 const responseSchema = {
-  type: Type.OBJECT,
+  type: "object",
   properties: {
-    candidateLevel: { type: Type.STRING, description: "Cấp độ ước tính (Junior, Senior...)" },
-    summary: { type: Type.STRING },
-    matchScore: { type: Type.INTEGER },
-    strengths: { type: Type.ARRAY, items: { type: Type.STRING } },
-    weaknesses: { type: Type.ARRAY, items: { type: Type.STRING } },
+    candidateLevel: { type: "string", description: "Cấp độ ước tính (Junior, Senior...)" },
+    summary: { type: "string" },
+    matchScore: { type: "integer" },
+    strengths: { type: "array", items: { type: "string" } },
+    weaknesses: { type: "array", items: { type: "string" } },
     detailedAnalysis: {
-      type: Type.OBJECT,
+      type: "object",
       properties: {
-        experienceMatch: { type: Type.STRING },
-        skillsAssessment: { type: Type.STRING },
-        jobStability: { type: Type.STRING },
-        employmentGaps: { type: Type.STRING },
-        progressionAndAwards: { type: Type.STRING },
-        teamworkAndSoftSkills: { type: Type.STRING },
-        proactivity: { type: Type.STRING }
+        experienceMatch: { type: "string" },
+        skillsAssessment: { type: "string" },
+        jobStability: { type: "string" },
+        employmentGaps: { type: "string" },
+        progressionAndAwards: { type: "string" },
+        teamworkAndSoftSkills: { type: "string" },
+        proactivity: { type: "string" }
       },
       required: ["experienceMatch", "skillsAssessment", "jobStability", "employmentGaps", "progressionAndAwards", "teamworkAndSoftSkills", "proactivity"]
     },
     suggestedJobs: {
-      type: Type.ARRAY,
-      items: { type: Type.OBJECT, properties: { title: { type: Type.STRING }, description: { type: Type.STRING } } }
+      type: "array",
+      items: { type: "object", properties: { title: { type: "string" }, description: { type: "string" } } }
     },
     suggestedProjects: {
-      type: Type.ARRAY,
-      items: { type: Type.OBJECT, properties: { title: { type: Type.STRING }, description: { type: Type.STRING } } }
+      type: "array",
+      items: { type: "object", properties: { title: { type: "string" }, description: { type: "string" } } }
     },
     suggestedCollaborators: {
-      type: Type.ARRAY,
-      items: { type: Type.OBJECT, properties: { title: { type: Type.STRING }, description: { type: Type.STRING } } }
+      type: "array",
+      items: { type: "object", properties: { title: { type: "string" }, description: { type: "string" } } }
     },
     developmentRoadmap: {
-      type: Type.OBJECT,
+      type: "object",
       description: "Lộ trình phát triển 3 bước",
       properties: {
         courses: {
-          type: Type.ARRAY,
+          type: "array",
           items: {
-            type: Type.OBJECT,
+            type: "object",
             properties: {
-              name: { type: Type.STRING, description: "Tên khóa học/chứng chỉ" },
-              provider: { type: Type.STRING, description: "Nền tảng hoặc tổ chức cấp (Coursera, Google...)" },
-              description: { type: Type.STRING, description: "Tại sao cần học cái này?" }
+              name: { type: "string", description: "Tên khóa học/chứng chỉ" },
+              provider: { type: "string", description: "Nền tảng hoặc tổ chức cấp (Coursera, Google...)" },
+              description: { type: "string", description: "Tại sao cần học cái này?" }
             }
           }
         },
         projects: {
-          type: Type.ARRAY,
+          type: "array",
           items: {
-            type: Type.OBJECT,
+            type: "object",
             properties: {
-              name: { type: Type.STRING, description: "Tên dự án/Startup idea" },
-              durationOrType: { type: Type.STRING, description: "Quy mô (Nhỏ, Trung bình, Startup)" },
-              description: { type: Type.STRING, description: "Mô tả dự án cần làm" }
+              name: { type: "string", description: "Tên dự án/Startup idea" },
+              durationOrType: { type: "string", description: "Quy mô (Nhỏ, Trung bình, Startup)" },
+              description: { type: "string", description: "Mô tả dự án cần làm" }
             }
           }
         },
         jobs: {
-          type: Type.ARRAY,
+          type: "array",
           items: {
-            type: Type.OBJECT,
+            type: "object",
             properties: {
-              name: { type: Type.STRING, description: "Vị trí công việc" },
-              provider: { type: Type.STRING, description: "Tên công ty (Mô phỏng)" },
-              description: { type: Type.STRING, description: "Yêu cầu chính hoặc mức lương ước tính" }
+              name: { type: "string", description: "Vị trí công việc" },
+              provider: { type: "string", description: "Tên công ty (Mô phỏng)" },
+              description: { type: "string", description: "Yêu cầu chính hoặc mức lương ước tính" }
             }
           }
         }
@@ -119,35 +119,35 @@ const responseSchema = {
 
 export const analyzeCV = async (base64Data: string, mimeType: string, targetJob: string): Promise<AnalysisResult> => {
   try {
+    const model = genAI.getGenerativeModel({ 
+      model: "gemini-1.5-flash",
+      generationConfig: {
+        responseMimeType: "application/json",
+        responseSchema: responseSchema
+      },
+      systemInstruction: SYSTEM_INSTRUCTION
+    });
+
     const prompt = `Vị trí công việc mục tiêu: ${targetJob || "Đánh giá tổng quát"}. 
     Hãy phân tích CV đính kèm và tạo lộ trình phát triển. Trả lời hoàn toàn bằng Tiếng Việt.`;
 
-    const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
-      contents: {
-        parts: [
-          {
-            inlineData: {
-              mimeType: mimeType,
-              data: base64Data
-            }
-          },
-          { text: prompt }
-        ]
-      },
-      config: {
-        systemInstruction: SYSTEM_INSTRUCTION,
-        responseMimeType: "application/json",
-        responseSchema: responseSchema
+    const imagePart = {
+      inlineData: {
+        data: base64Data,
+        mimeType: mimeType
       }
-    });
+    };
 
-    if (!response.text) {
+    const result = await model.generateContent([prompt, imagePart]);
+    const response = await result.response;
+    const text = response.text();
+
+    if (!text) {
       throw new Error("Không nhận được phản hồi từ Gemini");
     }
 
-    const result = JSON.parse(response.text) as AnalysisResult;
-    return result;
+    const analysisResult = JSON.parse(text) as AnalysisResult;
+    return analysisResult;
   } catch (error) {
     console.error("Lỗi phân tích Gemini:", error);
     throw error;
