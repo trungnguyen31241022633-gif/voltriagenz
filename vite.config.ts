@@ -11,8 +11,10 @@ export default defineConfig({
   },
   plugins: [react()],
   
-  // Vite tự động load env variables có prefix VITE_
-  // Không cần define thủ công
+  // Expose GEMINI_API_KEY từ Vercel env variables
+  define: {
+    'import.meta.env.GEMINI_API_KEY': JSON.stringify(process.env.GEMINI_API_KEY || ''),
+  },
   
   resolve: {
     alias: {
