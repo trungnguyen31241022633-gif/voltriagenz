@@ -1,20 +1,21 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { AnalysisResult } from "../types";
 
-// Lấy API key từ environment variables
+// Lấy API key - CHỈ có thể dùng biến có prefix VITE_
 const getApiKey = (): string => {
-  const key = import.meta.env.GEMINI_API_KEY;
+  const key = import.meta.env.VITE_GEMINI_API_KEY;
   
   if (!key) {
     throw new Error(
-      "❌ GEMINI_API_KEY chưa được cấu hình!\n\n" +
+      "❌ VITE_GEMINI_API_KEY chưa được cấu hình!\n\n" +
+      "⚠️ Vite CHỈ expose các biến có prefix VITE_ ra client-side!\n\n" +
       "Trên Vercel:\n" +
       "1. Vào Project Settings → Environment Variables\n" +
-      "2. Thêm: GEMINI_API_KEY = your_api_key\n" +
+      "2. Thêm: VITE_GEMINI_API_KEY = your_api_key\n" +
       "3. Redeploy project\n\n" +
       "Local development:\n" +
       "1. Tạo file .env.local\n" +
-      "2. Thêm: GEMINI_API_KEY=your_api_key\n\n" +
+      "2. Thêm: VITE_GEMINI_API_KEY=your_api_key\n\n" +
       "Lấy API key tại: https://makersuite.google.com/app/apikey"
     );
   }
