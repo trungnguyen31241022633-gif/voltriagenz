@@ -1,19 +1,20 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { AnalysisResult } from "../types";
 
-// Lấy API key từ Vercel Environment Variables
+// Lấy API key từ environment variables
 const getApiKey = (): string => {
-  // Thử các cách khác nhau để lấy env variable
-  const key = process.env.GEMINI_API_KEY || 
-              import.meta.env.GEMINI_API_KEY;
+  const key = import.meta.env.GEMINI_API_KEY;
   
   if (!key) {
     throw new Error(
       "❌ GEMINI_API_KEY chưa được cấu hình!\n\n" +
-      "Vui lòng thêm API key trên Vercel:\n" +
+      "Trên Vercel:\n" +
       "1. Vào Project Settings → Environment Variables\n" +
       "2. Thêm: GEMINI_API_KEY = your_api_key\n" +
       "3. Redeploy project\n\n" +
+      "Local development:\n" +
+      "1. Tạo file .env.local\n" +
+      "2. Thêm: GEMINI_API_KEY=your_api_key\n\n" +
       "Lấy API key tại: https://makersuite.google.com/app/apikey"
     );
   }
