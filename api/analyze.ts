@@ -1,24 +1,6 @@
-import { GoogleGenerativeAI } from "@google/generative-ai";
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 
-const SYSTEM_INSTRUCTION = `
-Bạn là Voltria AI - Chuyên gia phân tích CV chuyên nghiệp.
-
-**Nhiệm vụ:** Phân tích CV và đưa ra đánh giá toàn diện bằng Tiếng Việt.
-
-**Yêu cầu:**
-1. Đánh giá điểm mạnh/yếu rõ ràng
-2. Phân tích 7 khía cạnh: Kinh nghiệm, Kỹ năng, Ổn định công việc, Khoảng trống, Thăng tiến, Kỹ năng mềm, Chủ động
-3. Đề xuất lộ trình phát triển 3 giai đoạn:
-   - Giai đoạn 1: Khóa học/Chứng chỉ (Coursera, Udemy, AWS...)
-   - Giai đoạn 2: Dự án thực hành (Pet project, Open Source...)
-   - Giai đoạn 3: Cơ hội việc làm (Công ty, vị trí, lương)
-
-**Định dạng:** Trả về JSON chuẩn, văn phong chuyên nghiệp.
-`;
-
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  // Only allow POST
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
@@ -30,74 +12,125 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(400).json({ error: 'Missing required fields' });
     }
 
-    // Get API key from environment
     const apiKey = process.env.GEMINI_API_KEY;
     
     if (!apiKey) {
-      console.error('❌ GEMINI_API_KEY not found in environment');
+      console.error('❌ GEMINI_API_KEY not found');
       return res.status(500).json({ 
-        error: 'Server configuration error: GEMINI_API_KEY not set' 
+        error: 'GEMINI_API_KEY not configured' 
       });
     }
 
-    console.log('✅ API Key found, initializing Gemini...');
+    console.log('✅ API Key found');
 
-    const genAI = new GoogleGenerativeAI(apiKey);
-    const model = genAI.getGenerativeModel({ 
-      model: "gemini-1.5-flash-latest",
-      systemInstruction: SYSTEM_INSTRUCTION,
-      generationConfig: {
-        temperature: 0.7,
-        maxOutputTokens: 8192,
-      }
-    });
+    // Gọi trực tiếp REST API của Gemini
+    const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
 
     const prompt = `
-Phân tích CV này cho vị trí: ${targetJob || "Đánh giá tổng quát"}
+Bạn là Voltria AI - Chuyên gia phân tích CV. Phân tích CV cho vị trí: ${targetJob || "Tổng quát"}
 
-Trả về JSON với cấu trúc:
+Trả về JSON với cấu trúc SAU (KHÔNG thêm markdown backticks):
 {
   "candidateLevel": "Junior/Mid/Senior",
-  "summary": "Tóm tắt 2-3 câu",
+  "summary": "Tóm tắt ứng viên 2-3 câu bằng Tiếng Việt",
   "matchScore": 75,
-  "strengths": ["Điểm mạnh 1", "Điểm mạnh 2"],
+  "strengths": ["Điểm mạnh 1", "Điểm mạnh 2", "Điểm mạnh 3"],
   "weaknesses": ["Điểm yếu 1", "Điểm yếu 2"],
   "detailedAnalysis": {
-    "experienceMatch": "...",
-    "skillsAssessment": "...",
-    "jobStability": "...",
-    "employmentGaps": "...",
-    "progressionAndAwards": "...",
-    "teamworkAndSoftSkills": "...",
-    "proactivity": "..."
+    "experienceMatch": "Phân tích kinh nghiệm bằng Tiếng Việt",
+    "skillsAssessment": "Đánh giá kỹ năng bằng Tiếng Việt",
+    "jobStability": "Đánh giá độ ổn định",
+    "employmentGaps": "Phân tích khoảng trống",
+    "progressionAndAwards": "Thăng tiến và giải thưởng",
+    "teamworkAndSoftSkills": "Kỹ năng mềm",
+    "proactivity": "Tính chủ động"
   },
-  "suggestedJobs": [{"title": "", "description": ""}],
-  "suggestedProjects": [{"title": "", "description": ""}],
-  "suggestedCollaborators": [{"title": "", "description": ""}],
+  "suggestedJobs": [
+    {"title": "Tên công việc phù hợp", "description": "Mô tả bằng Tiếng Việt"}
+  ],
+  "suggestedProjects": [
+    {"title": "Tên dự án đề xuất", "description": "Mô tả bằng Tiếng Việt"}
+  ],
+  "suggestedCollaborators": [
+    {"title": "Loại cộng tác viên", "description": "Mô tả bằng Tiếng Việt"}
+  ],
   "developmentRoadmap": {
-    "courses": [{"name": "", "provider": "", "description": ""}],
-    "projects": [{"name": "", "durationOrType": "", "description": ""}],
-    "jobs": [{"name": "", "provider": "", "description": ""}]
+    "courses": [
+      {
+        "name": "Tên khóa học cụ thể",
+        "provider": "Coursera/Udemy/EdX",
+        "description": "Tại sao cần học bằng Tiếng Việt"
+      }
+    ],
+    "projects": [
+      {
+        "name": "Tên dự án thực hành",
+        "durationOrType": "3 tháng / Open Source",
+        "description": "Mô tả dự án bằng Tiếng Việt"
+      }
+    ],
+    "jobs": [
+      {
+        "name": "Vị trí công việc",
+        "provider": "Tên công ty VN (VD: Viettel, FPT...)",
+        "description": "Yêu cầu và mức lương bằng Tiếng Việt"
+      }
+    ]
   }
 }
 
-CHỈ trả về JSON, KHÔNG thêm text khác.
+QUAN TRỌNG: 
+- TẤT CẢ nội dung PHẢI bằng Tiếng Việt
+- CHỈ trả về JSON thuần, KHÔNG thêm text giải thích
+- KHÔNG dùng markdown code blocks
 `;
 
-    const imagePart = {
-      inlineData: {
-        data: base64Data,
-        mimeType: mimeType
+    const requestBody = {
+      contents: [
+        {
+          parts: [
+            { text: prompt },
+            {
+              inline_data: {
+                mime_type: mimeType,
+                data: base64Data
+              }
+            }
+          ]
+        }
+      ],
+      generationConfig: {
+        temperature: 0.7,
+        maxOutputTokens: 8192,
+        topP: 0.95,
       }
     };
 
-    console.log('📤 Sending request to Gemini...');
-    const result = await model.generateContent([prompt, imagePart]);
-    const response = await result.response;
-    let text = response.text();
+    console.log('📤 Sending request to Gemini REST API...');
 
-    console.log('📥 Received response');
+    const response = await fetch(apiUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(requestBody)
+    });
 
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('❌ Gemini API Error:', errorText);
+      throw new Error(`Gemini API error: ${response.status} - ${errorText}`);
+    }
+
+    const data = await response.json();
+    console.log('📥 Received response from Gemini');
+
+    if (!data.candidates || !data.candidates[0]?.content?.parts?.[0]?.text) {
+      throw new Error('Invalid response structure from Gemini');
+    }
+
+    let text = data.candidates[0].content.parts[0].text;
+    
     // Clean JSON
     text = text.trim();
     if (text.startsWith("```json")) {
@@ -109,6 +142,7 @@ CHỈ trả về JSON, KHÔNG thêm text khác.
 
     const analysisResult = JSON.parse(text);
     
+    console.log('✅ Analysis successful');
     return res.status(200).json(analysisResult);
 
   } catch (error: any) {
@@ -117,9 +151,11 @@ CHỈ trả về JSON, KHÔNG thêm text khác.
     let errorMessage = 'Đã xảy ra lỗi khi phân tích CV';
     
     if (error.message?.includes('API key not valid') || error.message?.includes('API_KEY_INVALID')) {
-      errorMessage = 'API Key không hợp lệ. Vui lòng kiểm tra cấu hình.';
-    } else if (error.message?.includes('quota')) {
-      errorMessage = 'Đã vượt quá giới hạn API. Vui lòng thử lại sau.';
+      errorMessage = 'API Key không hợp lệ. Vui lòng kiểm tra lại.';
+    } else if (error.message?.includes('quota') || error.message?.includes('RESOURCE_EXHAUSTED')) {
+      errorMessage = 'Đã vượt quá giới hạn API miễn phí.';
+    } else if (error.message) {
+      errorMessage = error.message;
     }
     
     return res.status(500).json({ error: errorMessage });
