@@ -86,9 +86,6 @@ const App: React.FC = () => {
         onOpenActivities={() => setShowActivities(true)} 
       />
       
-      {/* Hidden button for Header to click if needed via ID, though Event is cleaner */}
-      <button id="upload-section-trigger" className="hidden" onClick={handleStart}></button>
-
       <MyActivities 
         isOpen={showActivities} 
         onClose={() => setShowActivities(false)} 
