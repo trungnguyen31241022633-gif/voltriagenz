@@ -4,6 +4,7 @@ import LandingPage from './components/LandingPage';
 import UploadSection from './components/UploadSection';
 import AnalysisResultView from './components/AnalysisResult';
 import MyActivities from './components/MyActivities';
+import TestAPI from './components/TestAPI'; // THÊM DÒNG NÀY
 import { AnalysisResult, UploadState, ActivityItem } from './types';
 import { analyzeCV } from './services/geminiService';
 
@@ -12,24 +13,19 @@ const App: React.FC = () => {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [result, setResult] = useState<AnalysisResult | null>(null);
   
-  // State for Activities
   const [myActivities, setMyActivities] = useState<ActivityItem[]>([]);
   const [showActivities, setShowActivities] = useState(false);
 
   useEffect(() => {
-    // Listen for custom event from Header button to start analysis
     const handleStartEvent = () => handleStart();
     window.addEventListener('trigger-start-analysis', handleStartEvent);
 
-    // Listen for navigation events from Header (Features, About)
     const handleNavEvent = (e: Event) => {
       const customEvent = e as CustomEvent;
       const sectionId = customEvent.detail;
       
-      // Switch to landing page if not already there
       setView('landing');
       
-      // Scroll to section after a brief delay to allow rendering
       setTimeout(() => {
         const element = document.getElementById(sectionId);
         if (element) {
@@ -47,7 +43,6 @@ const App: React.FC = () => {
 
   const handleStart = () => {
     setView('analyze');
-    // We wait a tick for the component to render before scrolling
     setTimeout(() => {
         const el = document.getElementById('upload-area');
         el?.scrollIntoView({ behavior: 'smooth' });
@@ -65,14 +60,13 @@ const App: React.FC = () => {
       setResult(data);
     } catch (error) {
       console.error(error);
-      alert("Đã xảy ra lỗi trong quá trình phân tích. Vui lòng đảm bảo khóa API của bạn hợp lệ và thử lại.");
+      alert("Đã xảy ra lỗi trong quá trình phân tích. Vui lòng đảm bảo API đã được cấu hình đúng và thử lại.");
     } finally {
       setIsAnalyzing(false);
     }
   };
 
   const handleApplyItem = (item: ActivityItem) => {
-    // Avoid duplicates based on name
     setMyActivities(prev => {
       if (prev.some(i => i.name === item.name)) return prev;
       return [item, ...prev];
@@ -91,6 +85,9 @@ const App: React.FC = () => {
         onClose={() => setShowActivities(false)} 
         activities={myActivities}
       />
+
+      {/* THÊM COMPONENT TEST */}
+      <TestAPI />
 
       <main>
         {view === 'landing' && <LandingPage onStart={handleStart} />}
