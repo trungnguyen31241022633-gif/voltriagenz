@@ -1,7 +1,20 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { AnalysisResult } from "../types";
 
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+// Lấy API key từ environment variable
+const getApiKey = (): string => {
+  const key = import.meta.env.GEMINI_API_KEY || 
+              process.env.GEMINI_API_KEY || 
+              process.env.API_KEY;
+  
+  if (!key) {
+    throw new Error("GEMINI_API_KEY không được cấu hình. Vui lòng thêm vào Vercel Environment Variables.");
+  }
+  
+  return key;
+};
+
+const ai = new GoogleGenAI({ apiKey: getApiKey() });
 
 const SYSTEM_INSTRUCTION = `
 Bạn là Voltria, một Chuyên gia Tuyển dụng AI cao cấp. Mục tiêu của bạn là phân tích sâu CV và đưa ra phản hồi có cấu trúc.
