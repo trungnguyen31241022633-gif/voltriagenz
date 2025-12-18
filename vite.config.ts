@@ -1,37 +1,42 @@
 import path from 'path';
-import { defineConfig } from 'vite';
+import { defineConfig, loadEnv } from 'vite';
 import react from '@vitejs/plugin-react';
 
-export default defineConfig({
-  root: '.',
-  publicDir: 'public',
-  server: {
-    port: 3000,
-    host: '0.0.0.0',
-  },
-  plugins: [react()],
-  define: {
-    // Vercel sẽ inject biến môi trường vào đây
-    'process.env.GEMINI_API_KEY': JSON.stringify(process.env.GEMINI_API_KEY)
-  },
-  resolve: {
-    alias: {
-      '@': path.resolve(__dirname, '.'),
-    }
-  },
-  build: {
-    outDir: 'dist',
-    sourcemap: false,
-    rollupOptions: {
-      input: {
-        main: path.resolve(__dirname, 'index.html')
-      },
-      output: {
-        manualChunks: {
-          vendor: ['react', 'react-dom'],
-          recharts: ['recharts']
+export default defineConfig(({ mode }) => {
+  // Load env variables
+  const env = loadEnv(mode, process.cwd(), '');
+  
+  return {
+    root: '.',
+    publicDir: 'public',
+    server: {
+      port: 3000,
+      host: '0.0.0.0',
+    },
+    plugins: [react()],
+    define: {
+      // Inject API key vào runtime cho Vercel
+      'import.meta.env.VITE_GEMINI_API_KEY': JSON.stringify(env.GEMINI_API_KEY || '')
+    },
+    resolve: {
+      alias: {
+        '@': path.resolve(__dirname, '.'),
+      }
+    },
+    build: {
+      outDir: 'dist',
+      sourcemap: false,
+      rollupOptions: {
+        input: {
+          main: path.resolve(__dirname, 'index.html')
+        },
+        output: {
+          manualChunks: {
+            vendor: ['react', 'react-dom'],
+            recharts: ['recharts']
+          }
         }
       }
     }
-  }
+  };
 });
