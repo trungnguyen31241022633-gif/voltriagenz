@@ -1,198 +1,123 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { AnalysisResult } from "../types";
 
-// Lấy API key - Hỗ trợ cả VITE_GEMINI_API_KEY và GEMINI_API_KEY
+// Lấy API key từ environment variables
 const getApiKey = (): string => {
-  // Thử đọc cả 2 tên biến
-  const key = import.meta.env.VITE_GEMINI_API_KEY || import.meta.env.GEMINI_API_KEY;
+  // Thử nhiều cách đọc env variable
+  const key = import.meta.env.VITE_GEMINI_API_KEY || 
+              import.meta.env.GEMINI_API_KEY ||
+              (typeof process !== 'undefined' ? process.env.GEMINI_API_KEY : null) ||
+              (typeof process !== 'undefined' ? process.env.VITE_GEMINI_API_KEY : null);
   
   if (!key) {
     throw new Error(
-      "❌ API Key chưa được cấu hình!\n\n" +
-      "Trên Vercel (chọn 1 trong 2):\n" +
-      "• VITE_GEMINI_API_KEY = your_api_key (khuyên dùng)\n" +
-      "• GEMINI_API_KEY = your_api_key\n\n" +
-      "Local development - Tạo file .env.local:\n" +
-      "VITE_GEMINI_API_KEY=your_api_key\n\n" +
-      "Lấy API key tại: https://makersuite.google.com/app/apikey"
+      "❌ Không tìm thấy GEMINI_API_KEY!\n\n" +
+      "Vui lòng kiểm tra:\n" +
+      "1. Trên Vercel: Đã thêm GEMINI_API_KEY hoặc VITE_GEMINI_API_KEY\n" +
+      "2. Local: Đã tạo file .env.local với VITE_GEMINI_API_KEY=your_key\n" +
+      "3. Đã Redeploy sau khi thêm biến\n\n" +
+      "Lấy API key tại: https://aistudio.google.com/app/apikey"
     );
   }
   
   return key;
 };
 
-// Khởi tạo Gemini AI client
-const genAI = new GoogleGenerativeAI(getApiKey());
+// Khởi tạo Gemini AI
+let genAI: GoogleGenerativeAI;
+try {
+  genAI = new GoogleGenerativeAI(getApiKey());
+} catch (error) {
+  console.error("Lỗi khởi tạo Gemini:", error);
+  throw error;
+}
 
 const SYSTEM_INSTRUCTION = `
-Bạn là Voltria, một Chuyên gia Tuyển dụng AI cao cấp. Mục tiêu của bạn là phân tích sâu CV và đưa ra phản hồi có cấu trúc.
+Bạn là Voltria AI - Chuyên gia phân tích CV chuyên nghiệp.
 
-**QUAN TRỌNG:** TẤT CẢ NỘI DUNG TRẢ LỜI PHẢI BẰNG TIẾNG VIỆT.
+**Nhiệm vụ:** Phân tích CV và đưa ra đánh giá toàn diện bằng Tiếng Việt.
 
-**Quy tắc phân tích:**
-1. **Tóm tắt & Đánh giá:** Như quy trình chuẩn (Kinh nghiệm, Kỹ năng, Ổn định, Khoảng trống...).
-2. **Lộ trình phát triển (Roadmap):** Bạn PHẢI đề xuất một lộ trình 3 giai đoạn rõ ràng để ứng viên thăng tiến:
-   - **Giai đoạn 1: Nâng cao kiến thức.** Đề xuất các khóa học cụ thể (tên khóa, nền tảng như Coursera/Udemy/EdX) hoặc chứng chỉ (AWS, IELTS, PMP...) cần thiết để lấp lỗ hổng kỹ năng.
-   - **Giai đoạn 2: Thực hành & Xây dựng Portfolio.** Đề xuất các dự án cá nhân (Project nhỏ), tham gia Open Source, hoặc ý tưởng Start-up nhỏ phù hợp với kỹ năng để làm giàu CV.
-   - **Giai đoạn 3: Cơ hội nghề nghiệp (Fake Data mô phỏng thực tế).** Đề xuất các vị trí tại các loại hình công ty cụ thể (ví dụ: "Tập đoàn công nghệ Viettel - Vị trí Junior Dev", "Startup Fintech tại TP.HCM - Vị trí BA"). Hãy bịa ra các tên công ty hoặc dùng tên công ty thật phổ biến để tạo cảm giác thực tế.
+**Yêu cầu:**
+1. Đánh giá điểm mạnh/yếu rõ ràng
+2. Phân tích 7 khía cạnh: Kinh nghiệm, Kỹ năng, Ổn định công việc, Khoảng trống, Thăng tiến, Kỹ năng mềm, Chủ động
+3. Đề xuất lộ trình phát triển 3 giai đoạn:
+   - Giai đoạn 1: Khóa học/Chứng chỉ cần thiết (Coursera, Udemy, AWS...)
+   - Giai đoạn 2: Dự án thực hành (Pet project, Open Source...)
+   - Giai đoạn 3: Cơ hội việc làm phù hợp (Công ty cụ thể, vị trí, lương)
 
-**Yêu cầu đầu ra:**
-Trả về JSON hợp lệ khớp với Schema. Văn phong chuyên nghiệp, khích lệ.
+**Định dạng:** Trả về JSON chuẩn, văn phong chuyên nghiệp, động viên.
 `;
 
-const responseSchema = {
-  type: "object",
-  properties: {
-    candidateLevel: { 
-      type: "string", 
-      description: "Cấp độ ước tính (Junior, Senior...)" 
-    },
-    summary: { 
-      type: "string",
-      description: "Tóm tắt hồ sơ ứng viên"
-    },
-    matchScore: { 
-      type: "number",
-      description: "Điểm phù hợp từ 0-100"
-    },
-    strengths: { 
-      type: "array", 
-      items: { type: "string" },
-      description: "Các điểm mạnh"
-    },
-    weaknesses: { 
-      type: "array", 
-      items: { type: "string" },
-      description: "Các điểm yếu"
-    },
-    detailedAnalysis: {
-      type: "object",
-      properties: {
-        experienceMatch: { type: "string" },
-        skillsAssessment: { type: "string" },
-        jobStability: { type: "string" },
-        employmentGaps: { type: "string" },
-        progressionAndAwards: { type: "string" },
-        teamworkAndSoftSkills: { type: "string" },
-        proactivity: { type: "string" }
-      },
-      required: [
-        "experienceMatch", 
-        "skillsAssessment", 
-        "jobStability", 
-        "employmentGaps", 
-        "progressionAndAwards", 
-        "teamworkAndSoftSkills", 
-        "proactivity"
-      ]
-    },
-    suggestedJobs: {
-      type: "array",
-      items: { 
-        type: "object", 
-        properties: { 
-          title: { type: "string" }, 
-          description: { type: "string" } 
-        },
-        required: ["title", "description"]
-      }
-    },
-    suggestedProjects: {
-      type: "array",
-      items: { 
-        type: "object", 
-        properties: { 
-          title: { type: "string" }, 
-          description: { type: "string" } 
-        },
-        required: ["title", "description"]
-      }
-    },
-    suggestedCollaborators: {
-      type: "array",
-      items: { 
-        type: "object", 
-        properties: { 
-          title: { type: "string" }, 
-          description: { type: "string" } 
-        },
-        required: ["title", "description"]
-      }
-    },
-    developmentRoadmap: {
-      type: "object",
-      description: "Lộ trình phát triển 3 bước",
-      properties: {
-        courses: {
-          type: "array",
-          items: {
-            type: "object",
-            properties: {
-              name: { type: "string" },
-              provider: { type: "string" },
-              description: { type: "string" }
-            },
-            required: ["name", "description"]
-          }
-        },
-        projects: {
-          type: "array",
-          items: {
-            type: "object",
-            properties: {
-              name: { type: "string" },
-              durationOrType: { type: "string" },
-              description: { type: "string" }
-            },
-            required: ["name", "description"]
-          }
-        },
-        jobs: {
-          type: "array",
-          items: {
-            type: "object",
-            properties: {
-              name: { type: "string" },
-              provider: { type: "string" },
-              description: { type: "string" }
-            },
-            required: ["name", "description"]
-          }
-        }
-      },
-      required: ["courses", "projects", "jobs"]
-    }
-  },
-  required: [
-    "candidateLevel", 
-    "summary", 
-    "matchScore", 
-    "strengths", 
-    "weaknesses", 
-    "detailedAnalysis", 
-    "suggestedJobs", 
-    "suggestedProjects", 
-    "suggestedCollaborators", 
-    "developmentRoadmap"
-  ]
-};
-
-export const analyzeCV = async (base64Data: string, mimeType: string, targetJob: string): Promise<AnalysisResult> => {
+export const analyzeCV = async (
+  base64Data: string, 
+  mimeType: string, 
+  targetJob: string
+): Promise<AnalysisResult> => {
   try {
+    console.log("🚀 Bắt đầu phân tích CV...");
+    console.log("📄 MIME Type:", mimeType);
+    console.log("🎯 Vị trí mục tiêu:", targetJob || "Tổng quát");
+
     const model = genAI.getGenerativeModel({ 
       model: "gemini-1.5-flash",
-      generationConfig: {
-        responseMimeType: "application/json",
-        responseSchema: responseSchema,
-        temperature: 0.7,
-        maxOutputTokens: 8192,
-      },
       systemInstruction: SYSTEM_INSTRUCTION
     });
 
-    const prompt = `Vị trí công việc mục tiêu: ${targetJob || "Đánh giá tổng quát"}. 
-Hãy phân tích CV đính kèm và tạo lộ trình phát triển chi tiết. 
-Trả lời HOÀN TOÀN bằng Tiếng Việt.`;
+    const prompt = `
+Phân tích CV này cho vị trí: ${targetJob || "Đánh giá tổng quát"}
+
+Trả về JSON với cấu trúc SAU:
+{
+  "candidateLevel": "Junior/Mid/Senior",
+  "summary": "Tóm tắt 2-3 câu",
+  "matchScore": 75,
+  "strengths": ["Điểm mạnh 1", "Điểm mạnh 2", "Điểm mạnh 3"],
+  "weaknesses": ["Điểm yếu 1", "Điểm yếu 2"],
+  "detailedAnalysis": {
+    "experienceMatch": "Phân tích kinh nghiệm...",
+    "skillsAssessment": "Đánh giá kỹ năng...",
+    "jobStability": "Đánh giá độ ổn định...",
+    "employmentGaps": "Phân tích khoảng trống...",
+    "progressionAndAwards": "Thăng tiến và giải thưởng...",
+    "teamworkAndSoftSkills": "Kỹ năng mềm...",
+    "proactivity": "Tính chủ động..."
+  },
+  "suggestedJobs": [
+    {"title": "Tên công việc", "description": "Mô tả"}
+  ],
+  "suggestedProjects": [
+    {"title": "Tên dự án", "description": "Mô tả"}
+  ],
+  "suggestedCollaborators": [
+    {"title": "Loại cộng tác viên", "description": "Mô tả"}
+  ],
+  "developmentRoadmap": {
+    "courses": [
+      {
+        "name": "Tên khóa học",
+        "provider": "Coursera/Udemy",
+        "description": "Tại sao cần học"
+      }
+    ],
+    "projects": [
+      {
+        "name": "Tên dự án",
+        "durationOrType": "3 tháng",
+        "description": "Mô tả dự án"
+      }
+    ],
+    "jobs": [
+      {
+        "name": "Vị trí công việc",
+        "provider": "Tên công ty",
+        "description": "Yêu cầu và lương"
+      }
+    ]
+  }
+}
+
+QUAN TRỌNG: CHỈ trả về JSON, KHÔNG thêm text khác.
+`;
 
     const imagePart = {
       inlineData: {
@@ -201,26 +126,50 @@ Trả lời HOÀN TOÀN bằng Tiếng Việt.`;
       }
     };
 
+    console.log("📤 Gửi request đến Gemini...");
     const result = await model.generateContent([prompt, imagePart]);
     const response = await result.response;
-    const text = response.text();
+    let text = response.text();
+
+    console.log("📥 Nhận response từ Gemini");
+    console.log("📝 Response:", text.substring(0, 200) + "...");
 
     if (!text) {
       throw new Error("Không nhận được phản hồi từ Gemini AI");
     }
 
+    // Clean JSON response
+    text = text.trim();
+    if (text.startsWith("```json")) {
+      text = text.replace(/```json\n?/g, '').replace(/```\n?/g, '');
+    }
+    if (text.startsWith("```")) {
+      text = text.replace(/```\n?/g, '');
+    }
+
     const analysisResult = JSON.parse(text) as AnalysisResult;
+    console.log("✅ Phân tích thành công!");
+    
     return analysisResult;
   } catch (error: any) {
-    console.error("Lỗi phân tích Gemini:", error);
+    console.error("❌ Lỗi phân tích:", error);
     
-    // Thông báo lỗi chi tiết hơn
-    if (error.message?.includes('API key not valid')) {
-      throw new Error("API Key không hợp lệ. Vui lòng kiểm tra lại GEMINI_API_KEY trong Environment Variables.");
-    } else if (error.message?.includes('quota')) {
-      throw new Error("Đã vượt quá giới hạn API. Vui lòng thử lại sau hoặc nâng cấp API key.");
+    // Detailed error messages
+    if (error.message?.includes('API key not valid') || error.message?.includes('API_KEY_INVALID')) {
+      throw new Error(
+        "❌ API Key không hợp lệ!\n\n" +
+        "Vui lòng kiểm tra:\n" +
+        "1. API Key đúng format (bắt đầu bằng AIzaSy...)\n" +
+        "2. API Key còn active trên Google AI Studio\n" +
+        "3. Đã enable Gemini API trên project\n\n" +
+        "Lấy key mới tại: https://aistudio.google.com/app/apikey"
+      );
+    } else if (error.message?.includes('quota') || error.message?.includes('RESOURCE_EXHAUSTED')) {
+      throw new Error("❌ Đã vượt quá giới hạn API miễn phí. Vui lòng thử lại sau hoặc nâng cấp API key.");
+    } else if (error.message?.includes('parse')) {
+      throw new Error("❌ Lỗi parse JSON response. Có thể CV quá phức tạp, vui lòng thử lại.");
     } else {
-      throw new Error(`Lỗi phân tích CV: ${error.message || 'Không xác định'}`);
+      throw new Error(`❌ Lỗi không xác định: ${error.message}`);
     }
   }
 };
