@@ -29,12 +29,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     console.log('🎯 Target Job:', targetJob || 'General');
     console.log('📄 MIME Type:', mimeType);
 
-    // Khởi tạo Gemini AI với model name đúng
+    // Khởi tạo Gemini AI với model 2.0 hoặc 2.5
     const genAI = new GoogleGenerativeAI(apiKey);
     
-    // ✅ SỬA MODEL NAME - Thử các model có sẵn
+    // ✅ SỬ DỤNG MODEL ĐÚNG - Gemini 2.0 Flash (stable và miễn phí)
     const model = genAI.getGenerativeModel({ 
-      model: 'gemini-1.5-pro-latest'  // Hoặc 'gemini-pro-vision', 'gemini-1.5-pro'
+      model: 'gemini-2.0-flash-exp'  // Experimental nhưng miễn phí
+      // Hoặc thử: 'gemini-2.5-flash' nếu có quyền truy cập
     });
 
     // Tạo prompt
@@ -139,10 +140,11 @@ Hãy phân tích chi tiết, chuyên nghiệp và đưa ra lộ trình phát tri
       });
     }
     
-    if (error.message?.includes('not found')) {
+    if (error.message?.includes('not found') || error.message?.includes('NOT_FOUND')) {
       return res.status(500).json({ 
-        error: 'Model not found. Please check if your API key has access to the Gemini model.',
-        details: error.message
+        error: 'Model not available. Try updating to gemini-2.0-flash-exp or gemini-2.5-flash',
+        details: error.message,
+        suggestion: 'Thử các model: gemini-2.0-flash-exp, gemini-2.5-flash, hoặc gemini-pro-vision'
       });
     }
     
