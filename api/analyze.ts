@@ -1,6 +1,8 @@
-import type { VercelRequest, VercelResponse } from '@vercel/node';
+import { VercelRequest, VercelResponse } from '@vercel/node';
+import { GoogleGenerativeAI } from '@google/generative-ai';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
+  // Chỉ cho phép POST method
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
@@ -8,156 +10,141 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
     const { base64Data, mimeType, targetJob } = req.body;
 
+    // Validate input
     if (!base64Data || !mimeType) {
       return res.status(400).json({ error: 'Missing required fields' });
     }
 
+    // Lấy API key từ environment variables
     const apiKey = process.env.GEMINI_API_KEY;
     
     if (!apiKey) {
-      console.error('❌ GEMINI_API_KEY not found');
+      console.error('❌ GEMINI_API_KEY not found in environment variables');
       return res.status(500).json({ 
-        error: 'GEMINI_API_KEY not configured' 
+        error: 'API key not configured. Please add GEMINI_API_KEY to Vercel environment variables.' 
       });
     }
 
-    console.log('✅ API Key found');
+    console.log('🔑 API Key found:', apiKey.substring(0, 10) + '...');
+    console.log('🎯 Target Job:', targetJob || 'General');
+    console.log('📄 MIME Type:', mimeType);
 
-    // Gọi trực tiếp REST API của Gemini
-    const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+    // Khởi tạo Gemini AI
+    const genAI = new GoogleGenerativeAI(apiKey);
+    const model = genAI.getGenerativeModel({ 
+      model: 'gemini-2.0-flash-exp'
+    });
 
+    // Tạo prompt
     const prompt = `
-Bạn là Voltria AI - Chuyên gia phân tích CV. Phân tích CV cho vị trí: ${targetJob || "Tổng quát"}
+Bạn là chuyên gia tuyển dụng HR chuyên nghiệp. Phân tích CV này ${targetJob ? `cho vị trí "${targetJob}"` : 'một cách tổng quát'}.
 
-Trả về JSON với cấu trúc SAU (KHÔNG thêm markdown backticks):
+Trả về JSON theo định dạng sau (KHÔNG thêm markdown, KHÔNG thêm \`\`\`json):
+
 {
   "candidateLevel": "Junior/Mid/Senior",
-  "summary": "Tóm tắt ứng viên 2-3 câu bằng Tiếng Việt",
+  "summary": "Tóm tắt ngắn gọn về ứng viên",
   "matchScore": 75,
   "strengths": ["Điểm mạnh 1", "Điểm mạnh 2", "Điểm mạnh 3"],
   "weaknesses": ["Điểm yếu 1", "Điểm yếu 2"],
   "detailedAnalysis": {
-    "experienceMatch": "Phân tích kinh nghiệm bằng Tiếng Việt",
-    "skillsAssessment": "Đánh giá kỹ năng bằng Tiếng Việt",
-    "jobStability": "Đánh giá độ ổn định",
-    "employmentGaps": "Phân tích khoảng trống",
+    "experienceMatch": "Phân tích kinh nghiệm phù hợp với vị trí",
+    "skillsAssessment": "Đánh giá kỹ năng",
+    "jobStability": "Đánh giá độ ổn định công việc (job hopping)",
+    "employmentGaps": "Phân tích khoảng trống nghề nghiệp",
     "progressionAndAwards": "Thăng tiến và giải thưởng",
-    "teamworkAndSoftSkills": "Kỹ năng mềm",
-    "proactivity": "Tính chủ động"
+    "teamworkAndSoftSkills": "Kỹ năng mềm và làm việc nhóm",
+    "proactivity": "Tính chủ động và sáng tạo"
   },
   "suggestedJobs": [
-    {"title": "Tên công việc phù hợp", "description": "Mô tả bằng Tiếng Việt"}
+    {"title": "Vị trí công việc phù hợp", "description": "Mô tả"}
   ],
   "suggestedProjects": [
-    {"title": "Tên dự án đề xuất", "description": "Mô tả bằng Tiếng Việt"}
+    {"title": "Dự án nên làm", "description": "Mô tả"}
   ],
   "suggestedCollaborators": [
-    {"title": "Loại cộng tác viên", "description": "Mô tả bằng Tiếng Việt"}
+    {"title": "Đối tác hợp tác", "description": "Mô tả"}
   ],
   "developmentRoadmap": {
     "courses": [
       {
-        "name": "Tên khóa học cụ thể",
-        "provider": "Coursera/Udemy/EdX",
-        "description": "Tại sao cần học bằng Tiếng Việt"
+        "name": "Tên khóa học",
+        "provider": "Coursera/Udemy/etc",
+        "durationOrType": "3 tháng",
+        "description": "Mô tả chi tiết"
       }
     ],
     "projects": [
       {
-        "name": "Tên dự án thực hành",
-        "durationOrType": "3 tháng / Open Source",
-        "description": "Mô tả dự án bằng Tiếng Việt"
+        "name": "Tên dự án",
+        "provider": "Công ty/Tổ chức",
+        "durationOrType": "6 tháng",
+        "description": "Mô tả chi tiết"
       }
     ],
     "jobs": [
       {
         "name": "Vị trí công việc",
-        "provider": "Tên công ty VN (VD: Viettel, FPT...)",
-        "description": "Yêu cầu và mức lương bằng Tiếng Việt"
+        "provider": "Công ty",
+        "durationOrType": "Full-time",
+        "description": "Mô tả chi tiết"
       }
     ]
   }
 }
 
-QUAN TRỌNG: 
-- TẤT CẢ nội dung PHẢI bằng Tiếng Việt
-- CHỈ trả về JSON thuần, KHÔNG thêm text giải thích
-- KHÔNG dùng markdown code blocks
-`;
+Hãy phân tích chi tiết, chuyên nghiệp và đưa ra lộ trình phát triển cụ thể.`;
 
-    const requestBody = {
-      contents: [
-        {
-          parts: [
-            { text: prompt },
-            {
-              inline_data: {
-                mime_type: mimeType,
-                data: base64Data
-              }
-            }
-          ]
+    // Gọi Gemini API
+    const result = await model.generateContent([
+      {
+        inlineData: {
+          data: base64Data,
+          mimeType: mimeType
         }
-      ],
-      generationConfig: {
-        temperature: 0.7,
-        maxOutputTokens: 8192,
-        topP: 0.95,
-      }
-    };
-
-    console.log('📤 Sending request to Gemini REST API...');
-
-    const response = await fetch(apiUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
       },
-      body: JSON.stringify(requestBody)
-    });
+      prompt
+    ]);
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error('❌ Gemini API Error:', errorText);
-      throw new Error(`Gemini API error: ${response.status} - ${errorText}`);
-    }
+    const responseText = result.response.text();
+    console.log('📝 Raw response:', responseText.substring(0, 200) + '...');
 
-    const data = await response.json();
-    console.log('📥 Received response from Gemini');
-
-    if (!data.candidates || !data.candidates[0]?.content?.parts?.[0]?.text) {
-      throw new Error('Invalid response structure from Gemini');
-    }
-
-    let text = data.candidates[0].content.parts[0].text;
+    // Parse JSON response
+    let cleanedText = responseText.trim();
     
-    // Clean JSON
-    text = text.trim();
-    if (text.startsWith("```json")) {
-      text = text.replace(/```json\n?/g, '').replace(/```\n?/g, '');
-    }
-    if (text.startsWith("```")) {
-      text = text.replace(/```\n?/g, '');
+    // Loại bỏ markdown code blocks nếu có
+    if (cleanedText.startsWith('```json')) {
+      cleanedText = cleanedText.replace(/```json\n?/g, '').replace(/```\n?/g, '');
+    } else if (cleanedText.startsWith('```')) {
+      cleanedText = cleanedText.replace(/```\n?/g, '');
     }
 
-    const analysisResult = JSON.parse(text);
+    const analysisResult = JSON.parse(cleanedText);
     
-    console.log('✅ Analysis successful');
+    console.log('✅ Analysis successful!');
+    console.log('📊 Match Score:', analysisResult.matchScore);
+
     return res.status(200).json(analysisResult);
 
   } catch (error: any) {
-    console.error('❌ Error:', error);
+    console.error('❌ Error in API route:', error);
     
-    let errorMessage = 'Đã xảy ra lỗi khi phân tích CV';
-    
-    if (error.message?.includes('API key not valid') || error.message?.includes('API_KEY_INVALID')) {
-      errorMessage = 'API Key không hợp lệ. Vui lòng kiểm tra lại.';
-    } else if (error.message?.includes('quota') || error.message?.includes('RESOURCE_EXHAUSTED')) {
-      errorMessage = 'Đã vượt quá giới hạn API miễn phí.';
-    } else if (error.message) {
-      errorMessage = error.message;
+    // Chi tiết lỗi để debug
+    if (error.message?.includes('API key')) {
+      return res.status(500).json({ 
+        error: 'Invalid API key. Please check your GEMINI_API_KEY in Vercel settings.' 
+      });
     }
     
-    return res.status(500).json({ error: errorMessage });
+    if (error.message?.includes('JSON')) {
+      return res.status(500).json({ 
+        error: 'Failed to parse AI response. Please try again.' 
+      });
+    }
+
+    return res.status(500).json({ 
+      error: error.message || 'Internal server error',
+      details: process.env.NODE_ENV === 'development' ? error.stack : undefined
+    });
   }
 }
