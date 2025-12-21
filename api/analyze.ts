@@ -29,10 +29,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     console.log('🎯 Target Job:', targetJob || 'General');
     console.log('📄 MIME Type:', mimeType);
 
-    // Khởi tạo Gemini AI
+    // Khởi tạo Gemini AI với model name đúng
     const genAI = new GoogleGenerativeAI(apiKey);
+    
+    // ✅ SỬA MODEL NAME - Thử các model có sẵn
     const model = genAI.getGenerativeModel({ 
-      model: 'gemini-2.0-flash-exp'
+      model: 'gemini-1.5-pro-latest'  // Hoặc 'gemini-pro-vision', 'gemini-1.5-pro'
     });
 
     // Tạo prompt
@@ -132,13 +134,22 @@ Hãy phân tích chi tiết, chuyên nghiệp và đưa ra lộ trình phát tri
     // Chi tiết lỗi để debug
     if (error.message?.includes('API key')) {
       return res.status(500).json({ 
-        error: 'Invalid API key. Please check your GEMINI_API_KEY in Vercel settings.' 
+        error: 'Invalid API key. Please check your GEMINI_API_KEY in Vercel settings.',
+        details: error.message
+      });
+    }
+    
+    if (error.message?.includes('not found')) {
+      return res.status(500).json({ 
+        error: 'Model not found. Please check if your API key has access to the Gemini model.',
+        details: error.message
       });
     }
     
     if (error.message?.includes('JSON')) {
       return res.status(500).json({ 
-        error: 'Failed to parse AI response. Please try again.' 
+        error: 'Failed to parse AI response. Please try again.',
+        details: error.message
       });
     }
 
