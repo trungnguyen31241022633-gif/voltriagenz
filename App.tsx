@@ -131,7 +131,7 @@ const App: React.FC = () => {
       
       <footer className="bg-white border-t border-gray-100 py-12 mt-auto">
         <div className="max-w-7xl mx-auto px-4 text-center">
-           <p className="text-gray-400">© 2024 Voltria. Được hỗ trợ bởi Gemini 2.5 Flash.</p>
+           <p className="text-gray-400">© 2025 Voltria. Đội ngũ Voltria và AI</p>
         </div>
       </footer>
     </div>
