@@ -34,7 +34,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     
     // ✅ SỬ DỤNG MODEL ĐÚNG - Gemini 2.0 Flash (stable và miễn phí)
     const model = genAI.getGenerativeModel({ 
-      model: 'gemini-2.0-flash-exp'  // Experimental nhưng miễn phí
+      model: 'gemini-2.0-flash'  // Experimental nhưng miễn phí
       // Hoặc thử: 'gemini-2.5-flash' nếu có quyền truy cập
     });
 
