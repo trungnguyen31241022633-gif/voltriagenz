@@ -36,6 +36,29 @@ const compressImage = async (base64Data: string, mimeType: string): Promise<stri
   });
 };
 
+// ✅ GET API KEY - Works both on Vercel & Local
+const getApiKey = (): string => {
+  // Vite automatically loads VITE_ prefixed variables
+  const apiKey = import.meta.env.GEMINI_API_KEY;
+  
+  if (!apiKey) {
+    throw new Error(
+      '⚠️ API Key chưa cấu hình.\n\n' +
+      '📍 LOCAL:\n' +
+      '1. Tạo file .env.local\n' +
+      '2. Thêm: VITE_GEMINI_API_KEY=AIzaSy...\n' +
+      '3. Restart dev server\n\n' +
+      '📍 VERCEL:\n' +
+      '1. Settings → Environment Variables\n' +
+      '2. Thêm: VITE_GEMINI_API_KEY = AIzaSy...\n' +
+      '3. Redeploy\n\n' +
+      '🔗 Lấy key: https://aistudio.google.com/apikey'
+    );
+  }
+  
+  return apiKey;
+};
+
 export const analyzeCV = async (
   base64Data: string, 
   mimeType: string, 
@@ -64,25 +87,14 @@ export const analyzeCV = async (
       throw new Error(`File quá lớn (${sizeInMB.toFixed(2)}MB). Chọn file < 3MB.`);
     }
 
-    // Get API key from environment
-    // Try both with and without VITE_ prefix
-    let apiKey = import.meta.env.GEMINI_API_KEY;
-    
-    // Fallback to non-VITE prefix (for backward compatibility)
-    if (!apiKey) {
-      apiKey = import.meta.env.GEMINI_API_KEY;
-    }
-    
-    if (!apiKey) {
-      throw new Error('⚠️ API Key chưa cấu hình.\n\nVui lòng:\n1. Vào Vercel Dashboard\n2. Settings → Environment Variables\n3. Thêm: VITE_GEMINI_API_KEY = AIzaSy...\n4. Redeploy');
-    }
+    // ✅ Get API key
+    const apiKey = getApiKey();
+    console.log('🔑 API Key loaded:', apiKey.substring(0, 10) + '...');
 
-    console.log('🔑 API Key found:', apiKey.substring(0, 10) + '...');
-
-    // Initialize Gemini with 1.5 Flash
+    // Initialize Gemini with 1.5 Pro (stable model)
     const genAI = new GoogleGenerativeAI(apiKey);
     const model = genAI.getGenerativeModel({ 
-      model: 'gemini-1.5-pro',  // ✅ STABLE MODEL
+      model: 'gemini-1.5-pro',
       generationConfig: {
         temperature: 0.7,
         maxOutputTokens: 2048,
@@ -119,7 +131,7 @@ Phân tích CV này ${targetJob ? `cho vị trí "${targetJob}"` : 'tổng quát
 
 Phân tích chuyên nghiệp và chi tiết.`;
 
-    console.log('📤 Calling Gemini 1.5 Flash...');
+    console.log('📤 Calling Gemini 1.5 Pro...');
 
     // Call API with error handling
     let result;
@@ -136,7 +148,6 @@ Phân tích chuyên nghiệp và chi tiết.`;
     } catch (apiError: any) {
       console.error('API Call Error:', apiError);
       
-      // Handle specific Gemini API errors
       if (apiError.message?.includes('API key not valid')) {
         throw new Error('⚠️ API Key không hợp lệ. Vui lòng tạo key mới tại https://aistudio.google.com/apikey');
       }
@@ -168,7 +179,7 @@ Phân tích chuyên nghiệp và chi tiết.`;
       cleanedText = cleanedText.replace(/```\n?/g, '');
     }
 
-    // Try to parse JSON
+    // Parse JSON
     let analysisResult;
     try {
       analysisResult = JSON.parse(cleanedText) as AnalysisResult;
@@ -186,25 +197,12 @@ Phân tích chuyên nghiệp và chi tiết.`;
   } catch (error: any) {
     console.error("❌ Lỗi:", error);
     
-    // Detailed error messages
     if (error.message?.includes('API key') || error.message?.includes('API_KEY')) {
-      throw new Error("⚠️ API Key không hợp lệ hoặc chưa cấu hình.\n\nKiểm tra:\n1. API key đúng từ https://aistudio.google.com/apikey\n2. Đã thêm VITE_GEMINI_API_KEY vào Vercel\n3. Đã redeploy sau khi thêm env variable");
+      throw new Error("⚠️ API Key không hợp lệ hoặc chưa cấu hình.\n\nKiểm tra:\n1. API key đúng từ https://aistudio.google.com/apikey\n2. Đã thêm VITE_GEMINI_API_KEY vào .env.local (local) hoặc Vercel\n3. Đã restart dev server hoặc redeploy");
     }
     
-    if (error.message?.includes('404') || error.message?.includes('not found') || error.message?.includes('NOT_FOUND')) {
-      throw new Error("⚠️ Model không tồn tại.\n\nĐang dùng: gemini-1.5-flash\nNếu vẫn lỗi, kiểm tra API key còn hoạt động.");
-    }
-    
-    if (error.message?.includes('quota') || error.message?.includes('RESOURCE_EXHAUSTED')) {
-      throw new Error("⚠️ Vượt quá giới hạn API.\n\nThử:\n1. Đợi vài phút\n2. Hoặc tạo API key mới");
-    }
-    
-    if (error.message?.includes('PERMISSION_DENIED')) {
-      throw new Error("⚠️ API key không có quyền.\n\nTạo key mới tại: https://aistudio.google.com/apikey");
-    }
-    
-    if (error.message?.includes('Failed to fetch')) {
-      throw new Error("⚠️ Không kết nối được Gemini API.\n\nKiểm tra:\n1. Kết nối mạng\n2. CORS/Firewall");
+    if (error.message?.includes('404') || error.message?.includes('not found')) {
+      throw new Error("⚠️ Model không tồn tại.\n\nĐang dùng: gemini-1.5-pro\nNếu vẫn lỗi, kiểm tra API key còn hoạt động.");
     }
     
     throw new Error(error.message || "Lỗi không xác định khi phân tích CV");
