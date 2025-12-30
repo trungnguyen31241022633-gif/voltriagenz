@@ -2,23 +2,20 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 
 // =====================================================
-// CRITICAL: Vercel Serverless Function
-// Đọc API key từ process.env (Vercel Environment Variables)
+// VERCEL SERVERLESS FUNCTION - GEMINI API
 // =====================================================
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  // CORS headers (nếu cần)
+  // CORS headers
   res.setHeader('Access-Control-Allow-Credentials', 'true');
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,POST');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
-  // Handle OPTIONS request (preflight)
   if (req.method === 'OPTIONS') {
     return res.status(200).end();
   }
 
-  // Chỉ cho phép POST method
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
@@ -26,7 +23,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
     const { base64Data, mimeType, targetJob } = req.body;
 
-    // Validate input
     if (!base64Data || !mimeType) {
       return res.status(400).json({ 
         error: 'Missing required fields: base64Data, mimeType' 
@@ -34,49 +30,68 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     // =====================================================
-    // ĐỌC API KEY TỪ ENVIRONMENT VARIABLES
+    // ĐỌC API KEY
     // =====================================================
     const apiKey = process.env.GEMINI_API_KEY;
     
     if (!apiKey) {
-      console.error('❌ GEMINI_API_KEY not found in environment variables');
-      console.error('Available env keys:', Object.keys(process.env).filter(k => k.includes('GEMINI')));
-      
+      console.error('❌ GEMINI_API_KEY not found');
       return res.status(500).json({ 
-        error: '⚠️ API key chưa được cấu hình',
-        message: 'Vui lòng thêm GEMINI_API_KEY vào Vercel Environment Variables',
-        instructions: [
-          '1. Vào Vercel Dashboard → Your Project',
-          '2. Settings → Environment Variables',
-          '3. Add: Name=GEMINI_API_KEY, Value=your_key',
-          '4. Redeploy project'
-        ]
+        error: 'API key not configured',
+        message: 'Vui lòng thêm GEMINI_API_KEY vào Vercel Environment Variables'
       });
     }
 
-    console.log('🔑 API Key found:', apiKey.substring(0, 10) + '...');
+    console.log('🔑 API Key found:', apiKey.substring(0, 15) + '...');
     console.log('🎯 Target Job:', targetJob || 'General');
     console.log('📄 MIME Type:', mimeType);
 
     // =====================================================
-    // KHỞI TẠO GEMINI AI
+    // KHỞI TẠO GEMINI - SỬ DỤNG MODEL STABLE
     // =====================================================
     const genAI = new GoogleGenerativeAI(apiKey);
     
-    // Model list (thử theo thứ tự):
-    // 1. gemini-1.5-flash (stable, khuyên dùng)
-    // 2. gemini-2.0-flash-exp (experimental, miễn phí)
-    // 3. gemini-pro-vision (cũ hơn nhưng stable)
-    
-    const model = genAI.getGenerativeModel({ 
-      model: 'gemini-1.5-flash', // ✅ Model stable nhất
-      generationConfig: {
-        temperature: 0.7,
-        topK: 40,
-        topP: 0.95,
-        maxOutputTokens: 8192,
-      }
-    });
+    // ✅ SỬ DỤNG MODEL STABLE - THAY ĐỔI Ở ĐÂY!
+    // Thử các model theo thứ tự ưu tiên:
+    const MODEL_OPTIONS = [
+      'gemini-1.5-flash',           // ✅ STABLE NHẤT - Khuyên dùng
+      'gemini-1.5-flash-latest',    // Latest version
+      'gemini-1.5-pro',             // Pro version (chậm hơn nhưng tốt hơn)
+      'gemini-pro-vision'           // Cũ hơn nhưng vẫn hoạt động
+    ];
+
+    let model;
+    let selectedModel = MODEL_OPTIONS[0]; // Default: gemini-1.5-flash
+
+    try {
+      console.log(`🤖 Đang khởi tạo model: ${selectedModel}`);
+      
+      model = genAI.getGenerativeModel({ 
+        model: selectedModel,
+        generationConfig: {
+          temperature: 0.7,
+          topK: 40,
+          topP: 0.95,
+          maxOutputTokens: 8192,
+        }
+      });
+    } catch (modelError: any) {
+      console.error(`❌ Lỗi khởi tạo model ${selectedModel}:`, modelError.message);
+      
+      // Fallback sang model khác
+      selectedModel = MODEL_OPTIONS[3]; // gemini-pro-vision
+      console.log(`🔄 Thử lại với model: ${selectedModel}`);
+      
+      model = genAI.getGenerativeModel({ 
+        model: selectedModel,
+        generationConfig: {
+          temperature: 0.7,
+          topK: 40,
+          topP: 0.95,
+          maxOutputTokens: 8192,
+        }
+      });
+    }
 
     // =====================================================
     // TẠO PROMPT
@@ -85,63 +100,62 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
 **NHIỆM VỤ:** Phân tích CV ${targetJob ? `cho vị trí "${targetJob}"` : 'một cách tổng quát'}.
 
-**YÊU CẦU QUAN TRỌNG:**
-- TẤT CẢ nội dung phải bằng TIẾNG VIỆT
-- Trả về JSON thuần túy (KHÔNG có markdown, KHÔNG có \`\`\`json)
+**YÊU CẦU:**
+- TẤT CẢ nội dung TIẾNG VIỆT
+- Trả về JSON thuần (KHÔNG markdown, KHÔNG \`\`\`json)
 - Đánh giá khách quan, chuyên nghiệp
-- Đưa ra lộ trình phát triển cụ thể
 
-**ĐỊNH DẠNG JSON:**
+**FORMAT JSON:**
 {
   "candidateLevel": "Junior|Mid-level|Senior|Expert",
-  "summary": "Tóm tắt ngắn gọn về ứng viên (2-3 câu)",
+  "summary": "Tóm tắt 2-3 câu",
   "matchScore": 75,
-  "strengths": ["Điểm mạnh 1", "Điểm mạnh 2", "Điểm mạnh 3", "..."],
-  "weaknesses": ["Điểm yếu 1", "Điểm yếu 2", "..."],
+  "strengths": ["Điểm mạnh 1", "Điểm mạnh 2", "Điểm mạnh 3"],
+  "weaknesses": ["Điểm yếu 1", "Điểm yếu 2"],
   "detailedAnalysis": {
-    "experienceMatch": "Phân tích chi tiết về kinh nghiệm phù hợp với vị trí",
-    "skillsAssessment": "Đánh giá kỹ năng kỹ thuật và chuyên môn",
-    "jobStability": "Đánh giá độ ổn định công việc (có job hopping không?)",
-    "employmentGaps": "Phân tích khoảng trống nghề nghiệp (nếu có)",
-    "progressionAndAwards": "Thăng tiến sự nghiệp và giải thưởng",
-    "teamworkAndSoftSkills": "Kỹ năng mềm và làm việc nhóm",
-    "proactivity": "Tính chủ động, sáng tạo và đóng góp"
+    "experienceMatch": "Phân tích kinh nghiệm",
+    "skillsAssessment": "Đánh giá kỹ năng",
+    "jobStability": "Độ ổn định công việc",
+    "employmentGaps": "Khoảng trống nghề nghiệp",
+    "progressionAndAwards": "Thăng tiến & giải thưởng",
+    "teamworkAndSoftSkills": "Kỹ năng mềm",
+    "proactivity": "Tính chủ động"
   },
   "suggestedJobs": [
-    {"title": "Tên vị trí phù hợp", "description": "Mô tả chi tiết"}
+    {"title": "Vị trí phù hợp", "description": "Mô tả"}
   ],
   "suggestedProjects": [
-    {"title": "Dự án nên làm", "description": "Mô tả chi tiết"}
+    {"title": "Dự án nên làm", "description": "Mô tả"}
   ],
   "suggestedCollaborators": [
-    {"title": "Đối tác hợp tác tiềm năng", "description": "Mô tả"}
+    {"title": "Đối tác hợp tác", "description": "Mô tả"}
   ],
   "developmentRoadmap": {
     "courses": [
       {
-        "name": "Tên khóa học cụ thể",
-        "provider": "Coursera/Udemy/EdX/Google/AWS",
-        "description": "Tại sao cần học khóa này? (chi tiết)"
+        "name": "Tên khóa học",
+        "provider": "Coursera/Udemy/EdX",
+        "description": "Chi tiết khóa học"
       }
     ],
     "projects": [
       {
-        "name": "Tên dự án thực hành",
-        "durationOrType": "3-6 tháng / Dự án cá nhân",
-        "description": "Mô tả dự án và lợi ích"
+        "name": "Tên dự án",
+        "durationOrType": "3-6 tháng",
+        "description": "Mô tả dự án"
       }
     ],
     "jobs": [
       {
-        "name": "Vị trí công việc tiếp theo",
-        "provider": "Loại hình công ty (VD: Viettel, FPT, Startup Fintech)",
-        "description": "Yêu cầu và mức lương ước tính"
+        "name": "Vị trí tiếp theo",
+        "provider": "Loại công ty",
+        "description": "Yêu cầu & lương"
       }
     ]
   }
 }
 
-Hãy phân tích chi tiết, chuyên nghiệp và đưa ra lộ trình phát triển thực tế.`;
+Phân tích chi tiết và đưa ra lộ trình thực tế.`;
 
     // =====================================================
     // GỌI GEMINI API
@@ -159,72 +173,69 @@ Hãy phân tích chi tiết, chuyên nghiệp và đưa ra lộ trình phát tri
     ]);
 
     const responseText = result.response.text();
-    console.log('📥 Nhận được response:', responseText.substring(0, 100) + '...');
+    console.log('📥 Response length:', responseText.length, 'chars');
 
     // =====================================================
-    // PARSE JSON RESPONSE
+    // PARSE JSON
     // =====================================================
     let cleanedText = responseText.trim();
     
-    // Loại bỏ markdown code blocks nếu có
+    // Loại bỏ markdown
     if (cleanedText.startsWith('```json')) {
       cleanedText = cleanedText.replace(/^```json\s*/, '').replace(/\s*```$/, '');
     } else if (cleanedText.startsWith('```')) {
       cleanedText = cleanedText.replace(/^```\s*/, '').replace(/\s*```$/, '');
     }
 
-    // Parse JSON
     const analysisResult = JSON.parse(cleanedText);
     
-    // Validate required fields
+    // Validate
     if (!analysisResult.candidateLevel || !analysisResult.summary || typeof analysisResult.matchScore !== 'number') {
-      throw new Error('Invalid response format from AI');
+      throw new Error('Invalid response format');
     }
 
     console.log('✅ Analysis successful!');
     console.log('📊 Match Score:', analysisResult.matchScore);
-    console.log('👤 Candidate Level:', analysisResult.candidateLevel);
+    console.log('👤 Level:', analysisResult.candidateLevel);
+    console.log('🤖 Model used:', selectedModel);
 
-    // Trả về kết quả
     return res.status(200).json(analysisResult);
 
   } catch (error: any) {
-    console.error('❌ Error in API route:', error);
+    console.error('❌ Error:', error);
     
-    // Chi tiết lỗi để debug
     let errorResponse: any = {
-      error: 'Internal server error',
+      error: 'Analysis failed',
       message: error.message
     };
 
-    // Phân loại lỗi cụ thể
-    if (error.message?.includes('API key')) {
+    // Phân loại lỗi
+    if (error.message?.includes('API_KEY_INVALID') || error.message?.includes('API key')) {
       errorResponse = {
         error: 'Invalid API key',
-        message: 'API key không hợp lệ hoặc đã hết hạn',
-        instructions: 'Vui lòng kiểm tra GEMINI_API_KEY trong Vercel Environment Variables'
+        message: 'API key không hợp lệ. Vui lòng kiểm tra lại GEMINI_API_KEY',
+        solution: 'Tạo key mới tại: https://makersuite.google.com/app/apikey'
       };
-    } else if (error.message?.includes('not found') || error.message?.includes('NOT_FOUND')) {
+    } else if (error.message?.includes('404') || error.message?.includes('not found')) {
       errorResponse = {
         error: 'Model not available',
-        message: 'Model Gemini không khả dụng',
-        suggestion: 'Thử các model khác: gemini-1.5-flash, gemini-2.0-flash-exp, gemini-pro-vision'
-      };
-    } else if (error.message?.includes('JSON')) {
-      errorResponse = {
-        error: 'Failed to parse AI response',
-        message: 'Không thể parse JSON từ response AI',
-        details: error.message
+        message: 'Model không khả dụng',
+        suggestion: 'Đã tự động fallback sang gemini-1.5-flash hoặc gemini-pro-vision'
       };
     } else if (error.message?.includes('quota') || error.message?.includes('RESOURCE_EXHAUSTED')) {
       errorResponse = {
         error: 'Quota exceeded',
-        message: 'Đã hết quota API. Vui lòng kiểm tra billing trên Google AI Studio',
-        link: 'https://makersuite.google.com/app/apikey'
+        message: 'Đã hết quota API',
+        solution: 'Kiểm tra usage tại: https://makersuite.google.com/app/apikey'
+      };
+    } else if (error.message?.includes('JSON')) {
+      errorResponse = {
+        error: 'Parse error',
+        message: 'Không thể parse JSON từ AI response',
+        details: error.message
       };
     }
 
-    // Include stack trace in development
     if (process.env.NODE_ENV === 'development') {
       errorResponse.stack = error.stack;
     }
