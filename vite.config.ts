@@ -11,16 +11,12 @@ export default defineConfig({
   },
   plugins: [react()],
   
-  // Expose GEMINI_API_KEY từ Vercel env variables
-  define: {
-    'import.meta.env.GEMINI_API_KEY': JSON.stringify(process.env.GEMINI_API_KEY || ''),
-  },
-  
   resolve: {
     alias: {
       '@': path.resolve(__dirname, '.'),
     }
   },
+  
   build: {
     outDir: 'dist',
     sourcemap: false,
@@ -31,7 +27,8 @@ export default defineConfig({
       output: {
         manualChunks: {
           vendor: ['react', 'react-dom'],
-          recharts: ['recharts']
+          recharts: ['recharts'],
+          gemini: ['@google/generative-ai']
         }
       }
     }
