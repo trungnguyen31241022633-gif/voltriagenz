@@ -36,24 +36,40 @@ const compressImage = async (base64Data: string, mimeType: string): Promise<stri
   });
 };
 
-// ✅ GET API KEY - Works both on Vercel & Local
+// ✅ GET API KEY - Fixed version
 const getApiKey = (): string => {
-  // Vite automatically loads VITE_ prefixed variables
-  const apiKey = import.meta.env.GEMINI_API_KEY;
+  // Try VITE_ prefix first (recommended for Vite)
+  let apiKey = import.meta.env.VITE_GEMINI_API_KEY;
   
+  // Fallback: try without prefix (for backward compatibility)
   if (!apiKey) {
-    throw new Error(
-      '⚠️ API Key chưa cấu hình.\n\n' +
-      '📍 LOCAL:\n' +
-      '1. Tạo file .env.local\n' +
-      '2. Thêm: VITE_GEMINI_API_KEY=AIzaSy...\n' +
-      '3. Restart dev server\n\n' +
+    apiKey = import.meta.env.GEMINI_API_KEY;
+  }
+  
+  // Debug logs
+  console.log('🔍 Checking API Key...');
+  console.log('VITE_GEMINI_API_KEY exists:', !!import.meta.env.VITE_GEMINI_API_KEY);
+  console.log('GEMINI_API_KEY exists:', !!import.meta.env.GEMINI_API_KEY);
+  
+  if (!apiKey || apiKey.trim() === '') {
+    const errorMsg = 
+      '⚠️ API Key không tìm thấy!\n\n' +
+      '📍 KIỂM TRA:\n' +
+      '1. File .env.local có tồn tại không?\n' +
+      '2. Có dòng: VITE_GEMINI_API_KEY=AIzaSy...\n' +
+      '3. Đã RESTART dev server chưa? (Ctrl+C rồi npm run dev)\n\n' +
       '📍 VERCEL:\n' +
       '1. Settings → Environment Variables\n' +
       '2. Thêm: VITE_GEMINI_API_KEY = AIzaSy...\n' +
-      '3. Redeploy\n\n' +
-      '🔗 Lấy key: https://aistudio.google.com/apikey'
-    );
+      '3. PHẢI REDEPLOY sau khi thêm!\n\n' +
+      '🔗 Lấy key: https://aistudio.google.com/apikey';
+    
+    throw new Error(errorMsg);
+  }
+  
+  // Validate format
+  if (!apiKey.startsWith('AIzaSy')) {
+    throw new Error('⚠️ API Key không đúng format! Key phải bắt đầu bằng "AIzaSy..."');
   }
   
   return apiKey;
@@ -83,57 +99,64 @@ export const analyzeCV = async (
 
     // Check size
     const sizeInMB = (processedData.length * 0.75) / (1024 * 1024);
+    console.log(`📦 File size: ${sizeInMB.toFixed(2)}MB`);
+    
     if (sizeInMB > 3) {
       throw new Error(`File quá lớn (${sizeInMB.toFixed(2)}MB). Chọn file < 3MB.`);
     }
 
-    // ✅ Get API key
+    // ✅ Get and validate API key
     const apiKey = getApiKey();
-    console.log('🔑 API Key loaded:', apiKey.substring(0, 10) + '...');
+    console.log('✅ API Key loaded:', apiKey.substring(0, 15) + '...');
 
-    // Initialize Gemini with 1.5 Pro (stable model)
+    // Initialize Gemini
+    console.log('🔧 Initializing Gemini API...');
     const genAI = new GoogleGenerativeAI(apiKey);
     const model = genAI.getGenerativeModel({ 
       model: 'gemini-1.5-pro',
       generationConfig: {
         temperature: 0.7,
+        topP: 0.8,
+        topK: 40,
         maxOutputTokens: 2048,
+        responseMimeType: "application/json", // ✅ Force JSON response
       }
     });
 
     const prompt = `
-Phân tích CV này ${targetJob ? `cho vị trí "${targetJob}"` : 'tổng quát'}. Trả về JSON (KHÔNG thêm markdown):
+Bạn là chuyên gia phân tích CV. Phân tích CV này ${targetJob ? `cho vị trí "${targetJob}"` : 'tổng quát'}.
 
+QUAN TRỌNG: Chỉ trả về JSON thuần túy, không có markdown, không có giải thích thêm.
+
+Cấu trúc JSON bắt buộc:
 {
   "candidateLevel": "Junior/Mid/Senior",
-  "summary": "Tóm tắt 2-3 câu về ứng viên",
+  "summary": "Tóm tắt ngắn gọn về ứng viên",
   "matchScore": 75,
   "strengths": ["Điểm mạnh 1", "Điểm mạnh 2", "Điểm mạnh 3"],
   "weaknesses": ["Điểm yếu 1", "Điểm yếu 2"],
   "detailedAnalysis": {
-    "experienceMatch": "Phân tích kinh nghiệm phù hợp",
+    "experienceMatch": "Phân tích kinh nghiệm",
     "skillsAssessment": "Đánh giá kỹ năng",
-    "jobStability": "Độ ổn định công việc",
-    "employmentGaps": "Khoảng trống nghề nghiệp",
-    "progressionAndAwards": "Thăng tiến và giải thưởng",
+    "jobStability": "Độ ổn định",
+    "employmentGaps": "Khoảng trống",
+    "progressionAndAwards": "Thăng tiến",
     "teamworkAndSoftSkills": "Kỹ năng mềm",
-    "proactivity": "Tính chủ động"
+    "proactivity": "Chủ động"
   },
   "suggestedJobs": [{"title": "Vị trí", "description": "Mô tả"}],
   "suggestedProjects": [{"title": "Dự án", "description": "Mô tả"}],
   "suggestedCollaborators": [{"title": "Đối tác", "description": "Mô tả"}],
   "developmentRoadmap": {
-    "courses": [{"name": "Khóa học", "provider": "Platform", "durationOrType": "3 tháng", "description": "Chi tiết"}],
-    "projects": [{"name": "Dự án", "provider": "Công ty", "durationOrType": "6 tháng", "description": "Chi tiết"}],
-    "jobs": [{"name": "Vị trí", "provider": "Công ty", "durationOrType": "Full-time", "description": "Chi tiết"}]
+    "courses": [{"name": "Tên", "provider": "Nền tảng", "durationOrType": "Thời gian", "description": "Chi tiết"}],
+    "projects": [{"name": "Tên", "provider": "Nơi", "durationOrType": "Thời gian", "description": "Chi tiết"}],
+    "jobs": [{"name": "Vị trí", "provider": "Công ty", "durationOrType": "Loại", "description": "Chi tiết"}]
   }
-}
+}`;
 
-Phân tích chuyên nghiệp và chi tiết.`;
+    console.log('📤 Sending request to Gemini...');
 
-    console.log('📤 Calling Gemini 1.5 Pro...');
-
-    // Call API with error handling
+    // Call API
     let result;
     try {
       result = await model.generateContent([
@@ -145,64 +168,97 @@ Phân tích chuyên nghiệp và chi tiết.`;
         },
         prompt
       ]);
-    } catch (apiError: any) {
-      console.error('API Call Error:', apiError);
       
-      if (apiError.message?.includes('API key not valid')) {
-        throw new Error('⚠️ API Key không hợp lệ. Vui lòng tạo key mới tại https://aistudio.google.com/apikey');
+      console.log('✅ Received response from Gemini');
+    } catch (apiError: any) {
+      console.error('❌ API Call Error:', apiError);
+      console.error('Error details:', {
+        message: apiError.message,
+        status: apiError.status,
+        code: apiError.code
+      });
+      
+      if (apiError.message?.includes('API key not valid') || apiError.message?.includes('API_KEY_INVALID')) {
+        throw new Error('⚠️ API Key không hợp lệ!\n\nThử:\n1. Tạo key mới: https://aistudio.google.com/apikey\n2. Thay trong .env.local\n3. Restart: npm run dev');
       }
       
       if (apiError.message?.includes('User location is not supported')) {
-        throw new Error('⚠️ Gemini API không khả dụng ở khu vực của bạn. Thử dùng VPN.');
+        throw new Error('⚠️ Gemini chưa hỗ trợ khu vực của bạn. Thử dùng VPN.');
+      }
+      
+      if (apiError.message?.includes('quota') || apiError.message?.includes('RESOURCE_EXHAUSTED')) {
+        throw new Error('⚠️ Vượt giới hạn API. Đợi vài phút hoặc tạo key mới.');
       }
       
       throw new Error(`Gemini API Error: ${apiError.message || 'Unknown error'}`);
     }
 
+    // Validate response
     if (!result || !result.response) {
-      throw new Error('⚠️ Không nhận được phản hồi từ Gemini API');
+      console.error('❌ No response object');
+      throw new Error('⚠️ Không nhận được phản hồi từ Gemini');
     }
 
     const responseText = result.response.text();
+    console.log('📝 Raw response:', responseText.substring(0, 200) + '...');
     
     if (!responseText || responseText.trim().length === 0) {
       throw new Error('⚠️ Gemini trả về response rỗng');
     }
-    
-    console.log('📝 Response length:', responseText.length);
-    
-    // Clean response
-    let cleanedText = responseText.trim();
-    if (cleanedText.startsWith('```json')) {
-      cleanedText = cleanedText.replace(/```json\n?/g, '').replace(/```\n?/g, '');
-    } else if (cleanedText.startsWith('```')) {
-      cleanedText = cleanedText.replace(/```\n?/g, '');
-    }
 
-    // Parse JSON
-    let analysisResult;
+    // Clean response - remove markdown if present
+    let cleanedText = responseText.trim();
+    
+    // Remove various markdown formats
+    cleanedText = cleanedText
+      .replace(/^```json\s*/i, '')
+      .replace(/^```\s*/i, '')
+      .replace(/```\s*$/i, '')
+      .trim();
+    
+    console.log('🧹 Cleaned response:', cleanedText.substring(0, 200) + '...');
+
+    // Parse JSON with better error handling
+    let analysisResult: AnalysisResult;
     try {
-      analysisResult = JSON.parse(cleanedText) as AnalysisResult;
+      analysisResult = JSON.parse(cleanedText);
+      console.log("✅ JSON parsed successfully!");
     } catch (parseError: any) {
-      console.error('JSON Parse Error:', parseError);
-      console.error('Response text:', cleanedText.substring(0, 500));
-      throw new Error('⚠️ Không thể parse response từ Gemini. Response không phải JSON hợp lệ.');
+      console.error('❌ JSON Parse Error:', parseError.message);
+      console.error('Failed text (first 500 chars):', cleanedText.substring(0, 500));
+      
+      // Try to extract JSON if it's embedded in text
+      const jsonMatch = cleanedText.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        console.log('🔍 Found JSON pattern, trying to parse...');
+        try {
+          analysisResult = JSON.parse(jsonMatch[0]);
+          console.log("✅ JSON extracted and parsed!");
+        } catch (e) {
+          throw new Error('⚠️ Response không phải JSON hợp lệ. Gemini có thể đang trả về text thay vì JSON.');
+        }
+      } else {
+        throw new Error('⚠️ Không tìm thấy JSON trong response. Thử lại sau.');
+      }
+    }
+    
+    // Validate result structure
+    if (!analysisResult.matchScore || !analysisResult.summary) {
+      console.error('❌ Invalid result structure:', analysisResult);
+      throw new Error('⚠️ Dữ liệu trả về không đầy đủ. Thử lại.');
     }
     
     console.log("✅ Phân tích thành công!");
-    console.log("📊 Điểm:", analysisResult.matchScore);
+    console.log("📊 Điểm phù hợp:", analysisResult.matchScore);
     
     return analysisResult;
 
   } catch (error: any) {
-    console.error("❌ Lỗi:", error);
+    console.error("❌ Lỗi tổng:", error);
     
-    if (error.message?.includes('API key') || error.message?.includes('API_KEY')) {
-      throw new Error("⚠️ API Key không hợp lệ hoặc chưa cấu hình.\n\nKiểm tra:\n1. API key đúng từ https://aistudio.google.com/apikey\n2. Đã thêm VITE_GEMINI_API_KEY vào .env.local (local) hoặc Vercel\n3. Đã restart dev server hoặc redeploy");
-    }
-    
-    if (error.message?.includes('404') || error.message?.includes('not found')) {
-      throw new Error("⚠️ Model không tồn tại.\n\nĐang dùng: gemini-1.5-pro\nNếu vẫn lỗi, kiểm tra API key còn hoạt động.");
+    // Re-throw with more context
+    if (error.message?.includes('API')) {
+      throw error; // Already has good error message
     }
     
     throw new Error(error.message || "Lỗi không xác định khi phân tích CV");
