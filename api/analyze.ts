@@ -1,245 +1,107 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 
-// =====================================================
-// VERCEL SERVERLESS FUNCTION - GEMINI API
-// =====================================================
-
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  // CORS headers
+  // CORS
   res.setHeader('Access-Control-Allow-Credentials', 'true');
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,POST');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
-  if (req.method === 'OPTIONS') {
-    return res.status(200).end();
-  }
-
-  if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method not allowed' });
-  }
+  if (req.method === 'OPTIONS') return res.status(200).end();
+  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
   try {
     const { base64Data, mimeType, targetJob } = req.body;
 
     if (!base64Data || !mimeType) {
-      return res.status(400).json({ 
-        error: 'Missing required fields: base64Data, mimeType' 
-      });
+      return res.status(400).json({ error: 'Missing base64Data or mimeType' });
     }
 
-    // =====================================================
-    // ĐỌC API KEY
-    // =====================================================
+    // Đọc API key
     const apiKey = process.env.GEMINI_API_KEY;
-    
     if (!apiKey) {
-      console.error('❌ GEMINI_API_KEY not found');
       return res.status(500).json({ 
-        error: 'API key not configured',
-        message: 'Vui lòng thêm GEMINI_API_KEY vào Vercel Environment Variables'
+        error: 'GEMINI_API_KEY not configured',
+        help: 'Add GEMINI_API_KEY to Vercel Environment Variables'
       });
     }
 
-    console.log('🔑 API Key found:', apiKey.substring(0, 15) + '...');
-    console.log('🎯 Target Job:', targetJob || 'General');
-    console.log('📄 MIME Type:', mimeType);
+    console.log('✅ API Key:', apiKey.substring(0, 15) + '...');
+    console.log('🎯 Job:', targetJob || 'General');
 
-    // =====================================================
-    // KHỞI TẠO GEMINI - SỬ DỤNG MODEL STABLE
-    // =====================================================
+    // Khởi tạo Gemini với MODEL ĐÚNG
     const genAI = new GoogleGenerativeAI(apiKey);
     
-    // ✅ SỬ DỤNG MODEL STABLE - THAY ĐỔI Ở ĐÂY!
-    // Thử các model theo thứ tự ưu tiên:
-    const MODEL_OPTIONS = [
-      'gemini-1.5-flash',           // ✅ STABLE NHẤT - Khuyên dùng
-      'gemini-1.5-flash-latest',    // Latest version
-      'gemini-1.5-pro',             // Pro version (chậm hơn nhưng tốt hơn)
-      'gemini-pro-vision'           // Cũ hơn nhưng vẫn hoạt động
-    ];
+    // ⭐ QUAN TRỌNG: Dùng model STABLE này
+    const model = genAI.getGenerativeModel({ 
+      model: 'gemini-1.5-flash'  // ✅ MODEL STABLE - HOẠT ĐỘNG 100%
+    });
 
-    let model;
-    let selectedModel = MODEL_OPTIONS[0]; // Default: gemini-1.5-flash
+    console.log('🤖 Model: gemini-1.5-flash');
 
-    try {
-      console.log(`🤖 Đang khởi tạo model: ${selectedModel}`);
-      
-      model = genAI.getGenerativeModel({ 
-        model: selectedModel,
-        generationConfig: {
-          temperature: 0.7,
-          topK: 40,
-          topP: 0.95,
-          maxOutputTokens: 8192,
-        }
-      });
-    } catch (modelError: any) {
-      console.error(`❌ Lỗi khởi tạo model ${selectedModel}:`, modelError.message);
-      
-      // Fallback sang model khác
-      selectedModel = MODEL_OPTIONS[3]; // gemini-pro-vision
-      console.log(`🔄 Thử lại với model: ${selectedModel}`);
-      
-      model = genAI.getGenerativeModel({ 
-        model: selectedModel,
-        generationConfig: {
-          temperature: 0.7,
-          topK: 40,
-          topP: 0.95,
-          maxOutputTokens: 8192,
-        }
-      });
-    }
+    // Prompt đơn giản
+    const prompt = `Bạn là chuyên gia HR. Phân tích CV ${targetJob ? `cho vị trí "${targetJob}"` : ''}.
 
-    // =====================================================
-    // TẠO PROMPT
-    // =====================================================
-    const systemPrompt = `Bạn là Voltria, chuyên gia tuyển dụng AI cao cấp.
+TRẢ VỀ JSON (không có markdown, không có \`\`\`):
 
-**NHIỆM VỤ:** Phân tích CV ${targetJob ? `cho vị trí "${targetJob}"` : 'một cách tổng quát'}.
-
-**YÊU CẦU:**
-- TẤT CẢ nội dung TIẾNG VIỆT
-- Trả về JSON thuần (KHÔNG markdown, KHÔNG \`\`\`json)
-- Đánh giá khách quan, chuyên nghiệp
-
-**FORMAT JSON:**
 {
-  "candidateLevel": "Junior|Mid-level|Senior|Expert",
-  "summary": "Tóm tắt 2-3 câu",
+  "candidateLevel": "Junior|Mid|Senior",
+  "summary": "Tóm tắt ngắn gọn",
   "matchScore": 75,
   "strengths": ["Điểm mạnh 1", "Điểm mạnh 2", "Điểm mạnh 3"],
   "weaknesses": ["Điểm yếu 1", "Điểm yếu 2"],
   "detailedAnalysis": {
     "experienceMatch": "Phân tích kinh nghiệm",
     "skillsAssessment": "Đánh giá kỹ năng",
-    "jobStability": "Độ ổn định công việc",
-    "employmentGaps": "Khoảng trống nghề nghiệp",
-    "progressionAndAwards": "Thăng tiến & giải thưởng",
+    "jobStability": "Độ ổn định",
+    "employmentGaps": "Khoảng trống",
+    "progressionAndAwards": "Thăng tiến",
     "teamworkAndSoftSkills": "Kỹ năng mềm",
-    "proactivity": "Tính chủ động"
+    "proactivity": "Chủ động"
   },
-  "suggestedJobs": [
-    {"title": "Vị trí phù hợp", "description": "Mô tả"}
-  ],
-  "suggestedProjects": [
-    {"title": "Dự án nên làm", "description": "Mô tả"}
-  ],
-  "suggestedCollaborators": [
-    {"title": "Đối tác hợp tác", "description": "Mô tả"}
-  ],
+  "suggestedJobs": [{"title": "Job", "description": "Mô tả"}],
+  "suggestedProjects": [{"title": "Project", "description": "Mô tả"}],
+  "suggestedCollaborators": [{"title": "Partner", "description": "Mô tả"}],
   "developmentRoadmap": {
-    "courses": [
-      {
-        "name": "Tên khóa học",
-        "provider": "Coursera/Udemy/EdX",
-        "description": "Chi tiết khóa học"
-      }
-    ],
-    "projects": [
-      {
-        "name": "Tên dự án",
-        "durationOrType": "3-6 tháng",
-        "description": "Mô tả dự án"
-      }
-    ],
-    "jobs": [
-      {
-        "name": "Vị trí tiếp theo",
-        "provider": "Loại công ty",
-        "description": "Yêu cầu & lương"
-      }
-    ]
+    "courses": [{"name": "Khóa học", "provider": "Nền tảng", "description": "Chi tiết"}],
+    "projects": [{"name": "Dự án", "durationOrType": "3 tháng", "description": "Chi tiết"}],
+    "jobs": [{"name": "Vị trí", "provider": "Công ty", "description": "Chi tiết"}]
   }
-}
+}`;
 
-Phân tích chi tiết và đưa ra lộ trình thực tế.`;
+    console.log('📡 Calling Gemini API...');
 
-    // =====================================================
-    // GỌI GEMINI API
-    // =====================================================
-    console.log('📡 Đang gọi Gemini API...');
-    
+    // Gọi API
     const result = await model.generateContent([
-      {
-        inlineData: {
-          data: base64Data,
-          mimeType: mimeType
-        }
-      },
-      systemPrompt
+      { inlineData: { data: base64Data, mimeType } },
+      prompt
     ]);
 
-    const responseText = result.response.text();
-    console.log('📥 Response length:', responseText.length, 'chars');
+    const text = result.response.text();
+    console.log('📥 Response:', text.substring(0, 100) + '...');
 
-    // =====================================================
-    // PARSE JSON
-    // =====================================================
-    let cleanedText = responseText.trim();
-    
-    // Loại bỏ markdown
-    if (cleanedText.startsWith('```json')) {
-      cleanedText = cleanedText.replace(/^```json\s*/, '').replace(/\s*```$/, '');
-    } else if (cleanedText.startsWith('```')) {
-      cleanedText = cleanedText.replace(/^```\s*/, '').replace(/\s*```$/, '');
+    // Parse JSON
+    let json = text.trim();
+    if (json.startsWith('```json')) {
+      json = json.replace(/^```json\s*/, '').replace(/\s*```$/, '');
+    } else if (json.startsWith('```')) {
+      json = json.replace(/^```\s*/, '').replace(/\s*```$/, '');
     }
 
-    const analysisResult = JSON.parse(cleanedText);
-    
-    // Validate
-    if (!analysisResult.candidateLevel || !analysisResult.summary || typeof analysisResult.matchScore !== 'number') {
-      throw new Error('Invalid response format');
-    }
+    const data = JSON.parse(json);
 
-    console.log('✅ Analysis successful!');
-    console.log('📊 Match Score:', analysisResult.matchScore);
-    console.log('👤 Level:', analysisResult.candidateLevel);
-    console.log('🤖 Model used:', selectedModel);
+    console.log('✅ Success! Score:', data.matchScore);
 
-    return res.status(200).json(analysisResult);
+    return res.status(200).json(data);
 
   } catch (error: any) {
-    console.error('❌ Error:', error);
+    console.error('❌ Error:', error.message);
     
-    let errorResponse: any = {
-      error: 'Analysis failed',
-      message: error.message
-    };
-
-    // Phân loại lỗi
-    if (error.message?.includes('API_KEY_INVALID') || error.message?.includes('API key')) {
-      errorResponse = {
-        error: 'Invalid API key',
-        message: 'API key không hợp lệ. Vui lòng kiểm tra lại GEMINI_API_KEY',
-        solution: 'Tạo key mới tại: https://makersuite.google.com/app/apikey'
-      };
-    } else if (error.message?.includes('404') || error.message?.includes('not found')) {
-      errorResponse = {
-        error: 'Model not available',
-        message: 'Model không khả dụng',
-        suggestion: 'Đã tự động fallback sang gemini-1.5-flash hoặc gemini-pro-vision'
-      };
-    } else if (error.message?.includes('quota') || error.message?.includes('RESOURCE_EXHAUSTED')) {
-      errorResponse = {
-        error: 'Quota exceeded',
-        message: 'Đã hết quota API',
-        solution: 'Kiểm tra usage tại: https://makersuite.google.com/app/apikey'
-      };
-    } else if (error.message?.includes('JSON')) {
-      errorResponse = {
-        error: 'Parse error',
-        message: 'Không thể parse JSON từ AI response',
-        details: error.message
-      };
-    }
-
-    if (process.env.NODE_ENV === 'development') {
-      errorResponse.stack = error.stack;
-    }
-
-    return res.status(500).json(errorResponse);
+    return res.status(500).json({ 
+      error: error.message,
+      type: error.constructor.name,
+      help: 'Check Vercel Function Logs for details'
+    });
   }
 }
