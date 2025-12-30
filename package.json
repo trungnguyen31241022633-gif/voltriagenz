@@ -3,52 +3,25 @@
   "private": true,
   "version": "1.0.0",
   "type": "module",
-  "description": "AI-powered CV analysis tool using Gemini 2.5 Flash",
-  "author": "Voltria Team",
-  "license": "MIT",
-  "engines": {
-    "node": "20.x",
-    "npm": ">=9.0.0"
-  },
   "scripts": {
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
-    "type-check": "tsc --noEmit"
+    "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0"
   },
   "dependencies": {
-    "@google/generative-ai": "^0.21.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "recharts": "^2.12.7",
     "lucide-react": "^0.263.1",
-    "react": "^18.2.0",
-    "react-dom": "^18.2.0",
-    "recharts": "^2.10.3"
+    "@google/generative-ai": "^0.21.0"
   },
   "devDependencies": {
-    "@types/node": "^20.10.5",
-    "@types/react": "^18.2.43",
-    "@types/react-dom": "^18.2.17",
-    "@vercel/node": "^3.0.0",
-    "@vitejs/plugin-react": "^4.2.1",
-    "typescript": "^5.3.3",
-    "vite": "^5.0.8"
-  },
-  "keywords": [
-    "cv-analyzer",
-    "ai",
-    "gemini",
-    "recruitment",
-    "resume",
-    "typescript",
-    "react",
-    "vite"
-  ],
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/your-username/voltria.git"
-  },
-  "bugs": {
-    "url": "https://github.com/your-username/voltria/issues"
-  },
-  "homepage": "https://voltriagenz.vercel.app"
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1",
+    "@types/node": "^22.9.0",
+    "@vitejs/plugin-react": "^4.3.3",
+    "typescript": "^5.6.3",
+    "vite": "^5.4.11"
+  }
 }
