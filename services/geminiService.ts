@@ -66,7 +66,7 @@ export const analyzeCV = async (
 
     // Get API key from environment
     // Try both with and without VITE_ prefix
-    let apiKey = import.meta.env.VITE_GEMINI_API_KEY;
+    let apiKey = import.meta.env.GEMINI_API_KEY;
     
     // Fallback to non-VITE prefix (for backward compatibility)
     if (!apiKey) {
