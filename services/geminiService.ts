@@ -82,7 +82,7 @@ export const analyzeCV = async (
     // Initialize Gemini with 1.5 Flash
     const genAI = new GoogleGenerativeAI(apiKey);
     const model = genAI.getGenerativeModel({ 
-      model: 'gemini-1.5-flash',  // ✅ STABLE MODEL
+      model: 'gemini-1.5-pro',  // ✅ STABLE MODEL
       generationConfig: {
         temperature: 0.7,
         maxOutputTokens: 2048,
