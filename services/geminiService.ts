@@ -1,4 +1,5 @@
 import { AnalysisResult } from "../types";
+import { GoogleGenerativeAI } from '@google/generative-ai';
 
 // Compress image before sending
 const compressImage = async (base64Data: string, mimeType: string): Promise<string> => {
@@ -65,48 +66,118 @@ export const analyzeCV = async (
     // Check size limit (3MB after compression)
     const sizeInMB = (processedData.length * 0.75) / (1024 * 1024);
     if (sizeInMB > 3) {
-      throw new Error(`File quá lớn (${sizeInMB.toFixed(2)}MB). Vui lòng chọn file nhỏ hơn 3MB hoặc giảm độ phân giải.`);
+      throw new Error(`File quá lớn (${sizeInMB.toFixed(2)}MB). Vui lòng chọn file nhỏ hơn 3MB.`);
     }
 
-    console.log("🎯 Vị trí mục tiêu:", targetJob || "Tổng quát");
+    // Get API key from environment
+    const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
+    
+    if (!apiKey) {
+      throw new Error('⚠️ Chưa cấu hình API Key. Vui lòng thêm VITE_GEMINI_API_KEY vào file .env.local');
+    }
 
-    // Call API
-    const response = await fetch('/api/analyze', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        base64Data: processedData,
-        mimeType: processedMime,
-        targetJob: targetJob || ''
-      })
+    console.log('🔑 API Key found:', apiKey.substring(0, 10) + '...');
+    console.log('🎯 Target Job:', targetJob || 'General');
+
+    // Initialize Gemini AI directly in frontend
+    const genAI = new GoogleGenerativeAI(apiKey);
+    
+    // ✅ Use Gemini 1.5 Flash (stable, free, supports vision)
+    const model = genAI.getGenerativeModel({ 
+      model: 'gemini-1.5-flash',
+      generationConfig: {
+        temperature: 0.7,
+        maxOutputTokens: 2048,
+      }
     });
 
-    if (!response.ok) {
-      let errorMessage = 'Lỗi khi gọi API';
-      
-      try {
-        const errorData = await response.json();
-        errorMessage = errorData.error || errorMessage;
-        
-        if (errorMessage.includes('API key')) {
-          errorMessage = '⚠️ Chưa cấu hình API Key. Vui lòng thêm GEMINI_API_KEY vào Vercel Environment Variables.';
-        } else if (response.status === 413) {
-          errorMessage = '⚠️ File quá lớn. Vui lòng chọn file nhỏ hơn hoặc giảm độ phân giải.';
-        }
-      } catch (e) {
-        if (response.status === 413) {
-          errorMessage = '⚠️ File quá lớn (Payload Too Large). Vui lòng chọn file nhỏ hơn 3MB.';
-        } else {
-          errorMessage = `Lỗi ${response.status}: ${response.statusText}`;
-        }
+    // Create prompt
+    const prompt = `
+Bạn là chuyên gia tuyển dụng HR chuyên nghiệp. Phân tích CV này ${targetJob ? `cho vị trí "${targetJob}"` : 'một cách tổng quát'}.
+
+Trả về JSON theo định dạng sau (KHÔNG thêm markdown, KHÔNG thêm \`\`\`json):
+
+{
+  "candidateLevel": "Junior/Mid/Senior",
+  "summary": "Tóm tắt ngắn gọn về ứng viên (2-3 câu)",
+  "matchScore": 75,
+  "strengths": ["Điểm mạnh 1", "Điểm mạnh 2", "Điểm mạnh 3"],
+  "weaknesses": ["Điểm yếu 1", "Điểm yếu 2"],
+  "detailedAnalysis": {
+    "experienceMatch": "Phân tích kinh nghiệm phù hợp với vị trí",
+    "skillsAssessment": "Đánh giá kỹ năng",
+    "jobStability": "Đánh giá độ ổn định công việc (job hopping)",
+    "employmentGaps": "Phân tích khoảng trống nghề nghiệp",
+    "progressionAndAwards": "Thăng tiến và giải thưởng",
+    "teamworkAndSoftSkills": "Kỹ năng mềm và làm việc nhóm",
+    "proactivity": "Tính chủ động và sáng tạo"
+  },
+  "suggestedJobs": [
+    {"title": "Vị trí công việc phù hợp", "description": "Mô tả ngắn"}
+  ],
+  "suggestedProjects": [
+    {"title": "Dự án nên làm", "description": "Mô tả ngắn"}
+  ],
+  "suggestedCollaborators": [
+    {"title": "Đối tác hợp tác", "description": "Mô tả ngắn"}
+  ],
+  "developmentRoadmap": {
+    "courses": [
+      {
+        "name": "Tên khóa học",
+        "provider": "Coursera/Udemy/etc",
+        "durationOrType": "3 tháng",
+        "description": "Mô tả chi tiết"
       }
-      
-      throw new Error(errorMessage);
+    ],
+    "projects": [
+      {
+        "name": "Tên dự án",
+        "provider": "Công ty/Tổ chức",
+        "durationOrType": "6 tháng",
+        "description": "Mô tả chi tiết"
+      }
+    ],
+    "jobs": [
+      {
+        "name": "Vị trí công việc",
+        "provider": "Công ty",
+        "durationOrType": "Full-time",
+        "description": "Mô tả chi tiết"
+      }
+    ]
+  }
+}
+
+Hãy phân tích chi tiết, chuyên nghiệp và đưa ra lộ trình phát triển cụ thể.`;
+
+    console.log('📤 Sending request to Gemini API...');
+
+    // Call Gemini API directly
+    const result = await model.generateContent([
+      {
+        inlineData: {
+          data: processedData,
+          mimeType: processedMime
+        }
+      },
+      prompt
+    ]);
+
+    const responseText = result.response.text();
+    console.log('📝 Raw response length:', responseText.length);
+
+    // Parse JSON response
+    let cleanedText = responseText.trim();
+    
+    // Remove markdown code blocks if present
+    if (cleanedText.startsWith('```json')) {
+      cleanedText = cleanedText.replace(/```json\n?/g, '').replace(/```\n?/g, '');
+    } else if (cleanedText.startsWith('```')) {
+      cleanedText = cleanedText.replace(/```\n?/g, '');
     }
 
-    const analysisResult = await response.json() as AnalysisResult;
+    const analysisResult = JSON.parse(cleanedText) as AnalysisResult;
     
     console.log("✅ Phân tích thành công!");
     console.log("📊 Điểm phù hợp:", analysisResult.matchScore);
@@ -116,8 +187,25 @@ export const analyzeCV = async (
   } catch (error: any) {
     console.error("❌ Lỗi phân tích:", error);
     
+    // Handle specific errors
+    if (error.message?.includes('API key') || error.message?.includes('API_KEY')) {
+      throw new Error("⚠️ API Key không hợp lệ. Vui lòng kiểm tra VITE_GEMINI_API_KEY trong file .env.local");
+    }
+    
+    if (error.message?.includes('not found') || error.message?.includes('NOT_FOUND') || error.message?.includes('404')) {
+      throw new Error("⚠️ Model không khả dụng. Vui lòng kiểm tra API key và thử lại.");
+    }
+    
+    if (error.message?.includes('quota') || error.message?.includes('limit') || error.message?.includes('RESOURCE_EXHAUSTED')) {
+      throw new Error("⚠️ Đã vượt quá giới hạn API. Vui lòng thử lại sau.");
+    }
+    
+    if (error.message?.includes('PERMISSION_DENIED')) {
+      throw new Error("⚠️ API key không có quyền truy cập. Vui lòng kiểm tra lại key.");
+    }
+    
     if (error.message?.includes('Failed to fetch')) {
-      throw new Error("⚠️ Không thể kết nối đến server. Vui lòng kiểm tra kết nối mạng.");
+      throw new Error("⚠️ Không thể kết nối đến Gemini API. Vui lòng kiểm tra kết nối mạng.");
     }
     
     throw new Error(error.message || "Đã xảy ra lỗi không xác định khi phân tích CV");
